@@ -59,8 +59,8 @@ topdown_game_3d-v3/
 │   ├── camera_follow_3d.gd / minimap_3d.gd / day_night_cycle.gd
 │   ├── animal_spawner.gd      # 动物生成（+血量/掉落生肉）
 │   ├── animal_behavior.gd     # 动物行为
-│   ├── save_manager.gd           # ★ 存档管理器：5槽位，JSON读写 user://saves/
-│   ├── save_select_screen.gd     # ★ 存档选择界面：新建/进入/删除
+│   ├── save_manager.gd           # ★ 存档管理器：5槽位，JSON读写，可自定义路径
+│   ├── save_select_screen.gd     # ★ 存档选择界面：3D预览+动画预览+新建/进入/删除
 │   ├── start_screen.gd / menu_manager.gd / keybind_menu.gd / time_display.gd
 └── models/                    # 角色 + 24种动物 GLB
 ```
@@ -131,9 +131,20 @@ world_3d._ready()
 
 ## 7. 存档系统 ★ v3.2 新增
 
+### 存档选择界面
+
+启动后进入 SaveSelectScreen，左侧 5 个存档槽位，右侧 3D 角色预览（自动旋转）：
+
+- **空槽位** →「新建」→ 角色选择 → 新游戏 → 自动存档
+- **已有存档** →「进入」→ 直接加载世界状态
+- **删除按钮** → 确认弹窗 → 删除存档文件
+- **动画预览** → 底部 4 列动画按钮，点击循环播放，再次点击停止
+- **退出游戏** → 底部退出按钮
+- **自定义路径** →「设置路径」打开文件夹选择器 →「恢复默认」重置，均有确认弹窗
+
 ### 存档内容
 
-存档为 JSON 文件，位于 `user://saves/slot_0.json` ~ `slot_4.json`：
+存档为 JSON 文件，默认位于 `user://saves/slot_0.json` ~ `slot_4.json`，路径可自定义：
 
 | 类别 | 存储内容 |
 |------|---------|
@@ -150,12 +161,15 @@ world_3d._ready()
 | 退出 | 关闭游戏窗口 | 静默保存 |
 | 初始 | 新游戏开始后 | 立即创建存档 |
 
-### 存档操作
+### 自定义存档路径
 
-- **最多 5 个存档位**，超出需删除旧存档
-- 空槽位「新建」→ 角色选择 → 新游戏
-- 已有存档「进入」→ 直接加载世界状态
-- 删除需要确认对话框
+路径配置保存在 `user://save_config.json`，支持任意目录：
+
+```
+SaveManager.set_save_dir("D:/MySaves")     # 设置自定义路径
+SaveManager.reset_save_dir()               # 恢复默认 user://saves
+SaveManager.get_display_path()             # 获取实际绝对路径
+```
 
 ### 数据流
 
@@ -165,7 +179,8 @@ SaveManager (RefCounted 静态工具类)
   ├── load_save(slot)   → 读取完整 JSON
   ├── save_game(slot, data) → 写入 JSON
   ├── delete_save(slot) → 删除文件
-  └── has_save(slot)    → 检查是否存在
+  ├── set_save_dir(path) → 自定义存档目录
+  └── reset_save_dir()  → 恢复默认路径
 
 world_3d._collect_save_data()  → 收集玩家+世界状态
 world_3d._restore_from_save()  → 恢复位置/血量/背包/建筑/昼夜
@@ -192,5 +207,6 @@ world_3d._restore_from_save()  → 恢复位置/血量/背包/建筑/昼夜
 - **UI 缩放**：1920x1080 参考，scale 0.6~1.6
 - **GLB 动画**：attack-melee-* 用于挥击，die 用于死亡，均设 LOOP_NONE
 - **幽灵合法性**：占地(占用AABB) + 世界边界 + 材料是否足够，三者同时决定绿/红
-- **存档位置**：`user://saves/`（Windows: `%APPDATA%/Godot/app_userdata/TopDownGame3D/saves/`），JSON 格式可直接查看/编辑
+- **存档位置**：默认 `user://saves/`（Windows: `%APPDATA%/Godot/app_userdata/TopDownGame3D/saves/`），可在游戏内自定义
+- **路径配置**：`user://save_config.json`，SaveManager 启动时自动加载，无需手动编辑
 - **SaveManager 为静态 RefCounted**：无需实例化，直接 `SaveManager.save_game(slot, data)` 调用
