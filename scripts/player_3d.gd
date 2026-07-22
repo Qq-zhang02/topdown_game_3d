@@ -25,6 +25,7 @@ var _health: Node
 var _inventory: Node
 var _dead: bool = false
 var _attacking: bool = false
+var _knockback: Vector3 = Vector3.ZERO
 
 
 func set_model_path(path: String) -> void:
@@ -305,6 +306,10 @@ func get_inventory() -> Node:
 	return _inventory
 
 
+func apply_knockback(dir: Vector3, impulse: float) -> void:
+	_knockback = dir * impulse
+
+
 func is_dead() -> bool:
 	return _dead
 
@@ -400,6 +405,10 @@ func _physics_process(delta: float) -> void:
 	var current_speed: float = speed * 0.5 if is_aiming() else speed
 	velocity.x = input_dir.x * current_speed
 	velocity.z = input_dir.y * current_speed
+	# 击退（叠加后衰减）
+	velocity += _knockback
+	_knockback = _knockback.lerp(Vector3.ZERO, delta * 4.0)
+
 	move_and_slide()
 
 	_face_mouse()

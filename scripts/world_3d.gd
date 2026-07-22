@@ -861,7 +861,7 @@ func _knockback_player(from: Vector3) -> void:
 	dir.y = 0.0
 	dir = dir.normalized()
 	dir.y = 0.15  # 微微向上
-	_player.velocity += dir * 6.0
+	_player.apply_knockback(dir, 8.0)
 
 
 func _update_hp_bar() -> void:
