@@ -25,7 +25,7 @@ const PREVIEW_ANIMS := [
 # 布局常量（1920x1080 参考，左右对称居中，窄边距）
 const PREVIEW_X: float = 1140.0
 const PREVIEW_Y: float = 140.0
-const PREVIEW_SIZE: float = 600.0
+const PREVIEW_SIZE: float = 500.0
 const SLOT_X: float = 180.0
 const SLOT_Y: float = 140.0
 const SLOT_W: float = 850.0
@@ -282,10 +282,10 @@ func _create_preview() -> void:
 	container.add_child(_preview_viewport)
 
 	var cam := Camera3D.new()
-	cam.position = Vector3(0, 0.6, 3.8)
+	cam.position = Vector3(0, 1.0, 3.8)
 	cam.fov = 40.0
 	_preview_viewport.add_child(cam)
-	cam.look_at_from_position(cam.position, Vector3(0, 0.5, 0))
+	cam.look_at_from_position(cam.position, Vector3(0, 0.8, 0))
 
 	var light := DirectionalLight3D.new()
 	light.rotation_degrees = Vector3(-45, 30, 0)
