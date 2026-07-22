@@ -19,6 +19,7 @@ var _auto_save_timer: float = 0.0            # 自动存档计时器
 var _save_toast: Label                        # 自动存档提示标签
 var _hp_fill: ColorRect                       # 血条填充引用
 var _hp_label: Label                          # 血条文本引用
+var _damage_flash: ColorRect                  # 受伤红色闪烁
 var _loading_save: bool = false               # 是否正在加载存档（跳过初始保存）
 var _resource_positions: Array[Dictionary] = []  # 资源节点位置存档 [{kind, pos_x, pos_z}]
 var _regen_timer: float = 0.0                    # 资源重生计时器
@@ -96,6 +97,7 @@ func _on_game_started(model_path: String, skin_path: String, save_slot: int) -> 
 	_create_menu()
 	_create_time_display()
 	_create_hp_bar()
+	_create_damage_flash()
 	_game_started = true
 	# 创建自动存档提示
 	_create_save_toast()
@@ -801,8 +803,62 @@ func _create_hp_bar() -> void:
 	_update_hp_bar()
 
 
-func _on_hp_changed(_amount: float, _from: Vector3) -> void:
+func _on_hp_changed(amount: float, from: Vector3) -> void:
 	_update_hp_bar()
+	if amount > 0.0:
+		_show_damage_flash()
+		_tint_player_red()
+		_knockback_player(from)
+
+
+func _create_damage_flash() -> void:
+	var layer := CanvasLayer.new()
+	layer.name = "DamageFlashLayer"
+	layer.layer = 380
+	add_child(layer)
+	_damage_flash = ColorRect.new()
+	_damage_flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_damage_flash.color = Color(1, 0, 0, 0)
+	_damage_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(_damage_flash)
+
+
+func _show_damage_flash() -> void:
+	if not _damage_flash:
+		return
+	_damage_flash.color = Color(1, 0, 0, 0.3)
+	var tw := create_tween()
+	tw.tween_property(_damage_flash, "color:a", 0.0, 0.3)
+
+
+func _tint_player_red() -> void:
+	if not _player:
+		return
+	for mesh: MeshInstance3D in _player.find_children("*", "MeshInstance3D", true, false):
+		var m: Mesh = mesh.mesh
+		if not m:
+			continue
+		for i in m.get_surface_count():
+			var mat := mesh.get_active_material(i)
+			if not mat:
+				continue
+			mat = mat.duplicate()
+			var orig_color := mat.albedo_color
+			mat.albedo_color = Color.RED
+			mesh.set_surface_override_material(i, mat)
+			# 0.3秒后恢复原色
+			var tw := create_tween()
+			tw.tween_property(mat, "albedo_color", orig_color, 0.3)
+
+
+func _knockback_player(from: Vector3) -> void:
+	if not _player or from == Vector3.ZERO:
+		return
+	var dir := (_player.global_position - from)
+	dir.y = 0.0
+	dir = dir.normalized()
+	dir.y = 0.15  # 微微向上
+	_player.velocity += dir * 6.0
 
 
 func _update_hp_bar() -> void:
