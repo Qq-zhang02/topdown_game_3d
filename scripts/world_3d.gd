@@ -1019,7 +1019,9 @@ func _restore_from_save(data: Dictionary) -> void:
 	# 资源节点：用存档位置取代随机生成
 	var resources: Array = wd.get("resources", [])
 	if not resources.is_empty():
-		_resource_positions = resources
+		_resource_positions.clear()
+		for r in resources:
+			_resource_positions.append(r as Dictionary)
 		_spawn_resources_from_save()
 		print("[World3D] 资源恢复: %d 个" % resources.size())
 
