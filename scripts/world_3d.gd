@@ -76,6 +76,7 @@ func _on_game_started(model_path: String, skin_path: String, save_slot: int) -> 
 	_create_ocean()
 	_create_player(model_path, skin_path)
 	_ocean.setup(_player, _player.get_health())
+	_create_day_night_system()       # ★ 必须在动物之前创建
 	_create_resource_nodes()
 	_create_animals()
 	_create_camera(_player)
@@ -85,7 +86,6 @@ func _on_game_started(model_path: String, skin_path: String, save_slot: int) -> 
 	_create_build_system()
 	_create_death_screen()
 	_create_menu()
-	_create_day_night_system()
 	_create_time_display()
 	_create_hp_bar()
 	_game_started = true

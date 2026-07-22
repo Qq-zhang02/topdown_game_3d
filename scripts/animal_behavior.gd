@@ -69,6 +69,10 @@ func _physics_process(delta: float) -> void:
 
 func _is_night() -> bool:
 	if not _day_night:
+		var dns := get_tree().get_nodes_in_group("day_night_system")
+		if not dns.is_empty():
+			_day_night = dns[0]
+	if not _day_night:
 		return false
 	var hours: float = _day_night.get_time_hours()
 	if NIGHT_START_HOUR > NIGHT_END_HOUR:
