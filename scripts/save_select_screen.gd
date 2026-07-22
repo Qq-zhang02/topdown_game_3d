@@ -44,6 +44,7 @@ var _saves_info: Array[Dictionary] = []
 var _preview_viewport: SubViewport
 var _preview_model: Node3D
 var _playing_anim: bool = false
+var _current_anim_idx: int = -1
 var _anim_buttons: Array[Button] = []
 
 
@@ -282,10 +283,10 @@ func _create_preview() -> void:
 	container.add_child(_preview_viewport)
 
 	var cam := Camera3D.new()
-	cam.position = Vector3(0, 1.0, 3.8)
-	cam.fov = 40.0
+	cam.position = Vector3(0, 0.1, 3.8)
+	cam.fov = 50.0
 	_preview_viewport.add_child(cam)
-	cam.look_at_from_position(cam.position, Vector3(0, 0.8, 0))
+	cam.look_at_from_position(cam.position, Vector3(0, 0.1, 0))
 
 	var light := DirectionalLight3D.new()
 	light.rotation_degrees = Vector3(-45, 30, 0)
@@ -373,19 +374,25 @@ func _play_preview_anim(idx: int) -> void:
 	var ap := _preview_model.get_node_or_null("AnimationPlayer") as AnimationPlayer
 	if not ap:
 		return
+
+	# 点击同一个按钮 → 停止动画，恢复旋转
+	if idx == _current_anim_idx and _playing_anim:
+		ap.stop()
+		_playing_anim = false
+		_current_anim_idx = -1
+		return
+
 	var anim_name: String = PREVIEW_ANIMS[idx]
 	if not ap.has_animation(anim_name):
 		return
 
 	_playing_anim = true
-	ap.play(anim_name)
+	_current_anim_idx = idx
+	# 设置为循环播放
 	var anim := ap.get_animation(anim_name)
 	if anim:
-		get_tree().create_timer(anim.length).timeout.connect(_on_anim_done)
-
-
-func _on_anim_done() -> void:
-	_playing_anim = false
+		anim.loop_mode = Animation.LOOP_LINEAR
+	ap.play(anim_name)
 
 
 # ═══════════════════════════════════════════
@@ -489,6 +496,8 @@ func _rebuild() -> void:
 		child.queue_free()
 	_slot_panels.clear()
 	_anim_buttons.clear()
+	_current_anim_idx = -1
+	_playing_anim = false
 	_preview_model = null
 	_refresh_saves()
 	_build_ui()
