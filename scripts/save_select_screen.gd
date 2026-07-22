@@ -22,19 +22,19 @@ const PREVIEW_ANIMS := [
 	"wheelchair-move-forward", "wheelchair-move-back", "wheelchair-move-left", "wheelchair-move-right",
 ]
 
-# 布局常量（1920x1080 参考）
-const PREVIEW_X: float = 1120.0
+# 布局常量（1920x1080 参考，左右对称居中）
+const PREVIEW_X: float = 1090.0
 const PREVIEW_Y: float = 140.0
-const PREVIEW_SIZE: float = 280.0
-const SLOT_X: float = 460.0
+const PREVIEW_SIZE: float = 400.0
+const SLOT_X: float = 400.0
 const SLOT_Y: float = 140.0
-const SLOT_W: float = 580.0
-const SLOT_H: float = 108.0
+const SLOT_W: float = 600.0
+const SLOT_H: float = 112.0
 const SLOT_GAP: float = 16.0
-const ANIM_COLS := 5
-const ANIM_BTN_W: float = 140.0
+const ANIM_COLS := 4
+const ANIM_BTN_W: float = 95.0
 const ANIM_BTN_H: float = 22.0
-const ANIM_GAP: float = 8.0
+const ANIM_GAP: float = 6.0
 const ANIM_AREA_X: float = PREVIEW_X - 10.0  # 与预览框左对齐
 
 var _root: Control
@@ -145,7 +145,7 @@ func _build_ui() -> void:
 		var info_label := Label.new()
 		info_label.name = "InfoLabel"
 		info_label.position = Vector2(18, 44)
-		info_label.size = Vector2(370, 42)
+		info_label.size = Vector2(430, 42)
 		info_label.add_theme_font_size_override("font_size", 13)
 
 		if empty:
@@ -237,7 +237,7 @@ func _build_ui() -> void:
 		var btn := Button.new()
 		btn.text = PREVIEW_ANIMS[i]
 		btn.size = Vector2(ANIM_BTN_W, ANIM_BTN_H)
-		btn.add_theme_font_size_override("font_size", 11)
+		btn.add_theme_font_size_override("font_size", 12)
 		btn.pressed.connect(_play_preview_anim.bind(i))
 		_anim_buttons.append(btn)
 		_root.add_child(btn)
@@ -539,7 +539,7 @@ func _layout_ui() -> void:
 		elif child is Button and child.name == "ResetPathBtn":
 			child.position = Vector2(SLOT_X + 115, path_row2_y)
 		elif child is Button and child.name == "QuitBtn":
-			child.position = Vector2(SLOT_X + 350, path_row2_y)
+			child.position = Vector2(SLOT_X + SLOT_W - 130, path_row2_y)
 
 	# 动画按钮（预览框下方，5列 × 140px，延伸到右侧空白区）
 	for i in range(_anim_buttons.size()):
