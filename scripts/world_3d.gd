@@ -843,12 +843,15 @@ func _tint_player_red() -> void:
 			if not mat:
 				continue
 			mat = mat.duplicate()
-			var orig_color := mat.albedo_color
-			mat.albedo_color = Color.RED
+			var std_mat := mat as StandardMaterial3D
+			if not std_mat:
+				continue
+			var orig_color: Color = std_mat.albedo_color
+			std_mat.albedo_color = Color.RED
 			mesh.set_surface_override_material(i, mat)
 			# 0.3秒后恢复原色
 			var tw := create_tween()
-			tw.tween_property(mat, "albedo_color", orig_color, 0.3)
+			tw.tween_property(std_mat, "albedo_color", orig_color, 0.3)
 
 
 func _knockback_player(from: Vector3) -> void:
