@@ -155,6 +155,44 @@ func _build_ui() -> void:
 	hint.size = Vector2(500, 22)
 	_root.add_child(hint)
 
+	# ── 存档路径设置 ──
+	const PATH_Y: float = START_Y + MAX_SLOTS * (SLOT_H + GAP) + 45.0
+
+	var path_label := Label.new()
+	path_label.name = "PathLabel"
+	path_label.text = "存档路径: " + _shorten_path(SaveManager.get_display_path())
+	path_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	path_label.add_theme_font_size_override("font_size", 12)
+	path_label.add_theme_color_override("font_color", Color(0.45, 0.48, 0.55))
+	path_label.size = Vector2(SLOT_W, 20)
+	_root.add_child(path_label)
+
+	var btn_path := Button.new()
+	btn_path.name = "PathBtn"
+	btn_path.text = "设置路径"
+	btn_path.size = Vector2(100, 28)
+	btn_path.add_theme_font_size_override("font_size", 12)
+	btn_path.pressed.connect(_on_set_path)
+	_root.add_child(btn_path)
+
+	var btn_reset := Button.new()
+	btn_reset.name = "ResetPathBtn"
+	btn_reset.text = "恢复默认"
+	btn_reset.size = Vector2(100, 28)
+	btn_reset.add_theme_font_size_override("font_size", 12)
+	btn_reset.pressed.connect(_on_reset_path)
+	_root.add_child(btn_reset)
+
+	# FileDialog 选择文件夹
+	var fd := FileDialog.new()
+	fd.name = "PathFileDialog"
+	fd.access = FileDialog.ACCESS_FILESYSTEM
+	fd.file_mode = FileDialog.FILE_MODE_OPEN_DIR
+	fd.title = "选择存档目录"
+	fd.size = Vector2(700, 500)
+	fd.dir_selected.connect(_on_path_selected)
+	_root.add_child(fd)
+
 	# 定位
 	_layout_ui()
 
@@ -203,8 +241,59 @@ func _rebuild() -> void:
 
 
 # ═══════════════════════════════════════════
-# 工具
+# 路径设置
 # ═══════════════════════════════════════════
+
+func _on_set_path() -> void:
+	var fd := _root.get_node("PathFileDialog") as FileDialog
+	if fd:
+		# 从当前路径打开
+		var current := SaveManager.get_save_dir()
+		fd.current_dir = current if not current.begins_with("user://") else ProjectSettings.globalize_path(current)
+		fd.popup_centered()
+
+
+func _on_reset_path() -> void:
+	SaveManager.reset_save_dir()
+	_refresh_path_display()
+	_refresh_saves()
+	_rebuild_slots()
+
+
+func _on_path_selected(dir: String) -> void:
+	# 如果选中的目录在项目目录下，转为 res://
+	var project_dir := ProjectSettings.globalize_path("res://")
+	if dir.begins_with(project_dir):
+		var rel := dir.trim_prefix(project_dir)
+		SaveManager.set_save_dir("res://" + rel)
+	else:
+		SaveManager.set_save_dir(dir)
+	_refresh_path_display()
+	_refresh_saves()
+	_rebuild_slots()
+
+
+func _refresh_path_display() -> void:
+	var lbl := _root.get_node_or_null("PathLabel") as Label
+	if lbl:
+		lbl.text = "存档路径: " + _shorten_path(SaveManager.get_display_path())
+
+
+func _rebuild_slots() -> void:
+	# 只重建槽位面板，不重建整个 UI
+	for panel in _slot_panels:
+		panel.queue_free()
+	_slot_panels.clear()
+	# 需要在 _build_ui 中调用的槽位构建逻辑...
+	# 简化处理：全量重建
+	_rebuild()
+
+
+func _shorten_path(path: String) -> String:
+	if path.length() > 70:
+		return "..." + path.right(67)
+	return path
+
 
 func _format_play_time(seconds: float) -> String:
 	var total := int(seconds)
@@ -242,8 +331,16 @@ func _layout_ui() -> void:
 			var panel := _root.get_node(panel_name)
 			panel.position = Vector2(slot_x, START_Y + i * (SLOT_H + GAP))
 
+	const PATH_Y: float = START_Y + MAX_SLOTS * (SLOT_H + GAP) + 45.0
+
 	for child in _root.get_children():
 		if child is Label and child.text.begins_with("选择存档"):
 			child.position = Vector2((REF.x - child.size.x) / 2.0, 85.0)
 		elif child is Label and child.text.begins_with("最多"):
 			child.position = Vector2((REF.x - child.size.x) / 2.0, START_Y + MAX_SLOTS * (SLOT_H + GAP) + 15.0)
+		elif child is Label and child.name == "PathLabel":
+			child.position = Vector2(slot_x, PATH_Y)
+		elif child is Button and child.name == "PathBtn":
+			child.position = Vector2(slot_x + SLOT_W - 220, PATH_Y - 2)
+		elif child is Button and child.name == "ResetPathBtn":
+			child.position = Vector2(slot_x + SLOT_W - 110, PATH_Y - 2)

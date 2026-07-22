@@ -1,10 +1,45 @@
 extends RefCounted
 class_name SaveManager
-## 存档管理器：读写 user://saves/ 下的 JSON 存档文件
+## 存档管理器：读写 JSON 存档文件，支持自定义存档路径
 
-const SAVE_DIR := "user://saves"
+const CONFIG_PATH := "user://save_config.json"
+const DEFAULT_SAVE_DIR := "user://saves"
 const MAX_SLOTS := 5
 const SAVE_VERSION := 1
+
+static var _save_dir: String = ""  # 懒加载，首次调用时从配置读取
+
+
+# ═══════════════════════════════════════════
+# 路径管理
+# ═══════════════════════════════════════════
+
+## 获取当前存档目录（绝对路径或 user:// 格式）
+static func get_save_dir() -> String:
+	if _save_dir.is_empty():
+		_save_dir = _load_config().get("save_dir", DEFAULT_SAVE_DIR)
+	return _save_dir
+
+
+## 设置存档目录
+static func set_save_dir(path: String) -> void:
+	_save_dir = path
+	var cfg := _load_config()
+	cfg["save_dir"] = path
+	_save_config(cfg)
+
+
+## 重置为默认路径
+static func reset_save_dir() -> void:
+	set_save_dir(DEFAULT_SAVE_DIR)
+
+
+## 获取用于显示的路径（%APPDATA% → 实际路径）
+static func get_display_path() -> String:
+	var dir := get_save_dir()
+	if dir.begins_with("user://"):
+		return ProjectSettings.globalize_path(dir)
+	return dir
 
 
 # ═══════════════════════════════════════════
@@ -71,7 +106,8 @@ static func load_save(slot: int) -> Dictionary:
 
 
 static func save_game(slot: int, data: Dictionary) -> bool:
-	DirAccess.make_dir_recursive_absolute(SAVE_DIR)
+	var dir := get_save_dir()
+	DirAccess.make_dir_recursive_absolute(dir)
 
 	var path := _slot_path(slot)
 	var file := FileAccess.open(path, FileAccess.WRITE)
@@ -97,8 +133,34 @@ static func has_save(slot: int) -> bool:
 
 
 # ═══════════════════════════════════════════
+# 配置读写
+# ═══════════════════════════════════════════
+
+static func _load_config() -> Dictionary:
+	if not FileAccess.file_exists(CONFIG_PATH):
+		return {}
+	var file := FileAccess.open(CONFIG_PATH, FileAccess.READ)
+	if not file:
+		return {}
+	var json := JSON.new()
+	if json.parse(file.get_as_text()) != OK:
+		file.close()
+		return {}
+	file.close()
+	return json.get_data()
+
+
+static func _save_config(cfg: Dictionary) -> void:
+	var file := FileAccess.open(CONFIG_PATH, FileAccess.WRITE)
+	if not file:
+		return
+	file.store_string(JSON.stringify(cfg, "\t"))
+	file.close()
+
+
+# ═══════════════════════════════════════════
 # 内部
 # ═══════════════════════════════════════════
 
 static func _slot_path(slot: int) -> String:
-	return SAVE_DIR.path_join("slot_%d.json" % slot)
+	return get_save_dir().path_join("slot_%d.json" % slot)
