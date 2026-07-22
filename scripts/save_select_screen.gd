@@ -7,6 +7,20 @@ signal new_game(slot: int)
 
 const MAX_SLOTS := 5
 const DEFAULT_MODEL := "res://models/character/character-archer.glb"
+const DEFAULT_SKIN := "res://models/character/colormap.png"
+
+# 动画预览列表
+const PREVIEW_ANIMS := [
+	"idle", "walk", "sprint", "jump", "fall", "die", "crouch",
+	"static", "sit", "drive", "pick-up",
+	"attack-melee-left", "attack-melee-right", "attack-kick-left", "attack-kick-right",
+	"holding-both", "holding-both-shoot", "holding-left", "holding-left-shoot",
+	"holding-right", "holding-right-shoot",
+	"interact-left", "interact-right",
+	"emote-no", "emote-yes",
+	"wheelchair-sit", "wheelchair-look-left", "wheelchair-look-right",
+	"wheelchair-move-forward", "wheelchair-move-back", "wheelchair-move-left", "wheelchair-move-right",
+]
 
 # 布局常量（1920x1080 参考）
 const PREVIEW_X: float = 60.0
@@ -24,6 +38,8 @@ var _title: Label
 var _saves_info: Array[Dictionary] = []
 var _preview_viewport: SubViewport
 var _preview_model: Node3D
+var _playing_anim: bool = false
+var _anim_buttons: Array[Button] = []
 
 
 func _ready() -> void:
@@ -201,6 +217,40 @@ func _build_ui() -> void:
 	btn_reset.pressed.connect(_on_reset_path)
 	_root.add_child(btn_reset)
 
+	# ── 动画预览按钮（左侧预览区下方）──
+	var anim_label := Label.new()
+	anim_label.name = "AnimLabel"
+	anim_label.text = "动画预览:"
+	anim_label.add_theme_font_size_override("font_size", 12)
+	anim_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.6))
+	anim_label.size = Vector2(200, 18)
+	_root.add_child(anim_label)
+
+	const ANIM_COLS := 3
+	var anim_btn_w: float = 73.0
+	var anim_btn_h: float = 18.0
+	var anim_gap: float = 3.0
+
+	for i in range(PREVIEW_ANIMS.size()):
+		var row: int = i / ANIM_COLS
+		var col: int = i % ANIM_COLS
+		var btn := Button.new()
+		btn.text = PREVIEW_ANIMS[i]
+		btn.size = Vector2(anim_btn_w, anim_btn_h)
+		btn.add_theme_font_size_override("font_size", 9)
+		btn.pressed.connect(_play_preview_anim.bind(i))
+		_anim_buttons.append(btn)
+		_root.add_child(btn)
+
+	# ── 退出游戏按钮 ──
+	var btn_quit := Button.new()
+	btn_quit.name = "QuitBtn"
+	btn_quit.text = "退出游戏"
+	btn_quit.size = Vector2(120, 34)
+	btn_quit.add_theme_font_size_override("font_size", 14)
+	btn_quit.pressed.connect(func(): get_tree().quit())
+	_root.add_child(btn_quit)
+
 	# FileDialog
 	var fd := FileDialog.new()
 	fd.name = "PathFileDialog"
@@ -268,6 +318,8 @@ func _load_preview_model() -> void:
 	_preview_model = scene.instantiate()
 	_preview_viewport.add_child(_preview_model)
 
+	_apply_preview_skin()
+
 	var aabb := _get_model_aabb(_preview_model)
 	if aabb.size.length_squared() > 0.01:
 		var max_dim := maxf(aabb.size.x, maxf(aabb.size.y, aabb.size.z))
@@ -291,9 +343,49 @@ func _get_model_aabb(node: Node3D) -> AABB:
 	return aabb
 
 
+func _apply_preview_skin() -> void:
+	if not ResourceLoader.exists(DEFAULT_SKIN):
+		return
+	var tex: Texture2D = load(DEFAULT_SKIN)
+	if not tex:
+		return
+	for mesh: MeshInstance3D in _preview_model.find_children("*", "MeshInstance3D", true, false):
+		var m: Mesh = mesh.mesh
+		if not m:
+			continue
+		for i in m.get_surface_count():
+			var mat := mesh.get_active_material(i)
+			if not mat:
+				continue
+			mat = mat.duplicate()
+			mat.albedo_texture = tex
+			mesh.set_surface_override_material(i, mat)
+
+
 func _process(delta: float) -> void:
-	if _preview_model:
+	if _preview_model and not _playing_anim:
 		_preview_model.rotation.y -= delta * 1.2
+
+
+func _play_preview_anim(idx: int) -> void:
+	if not _preview_model:
+		return
+	var ap := _preview_model.get_node_or_null("AnimationPlayer") as AnimationPlayer
+	if not ap:
+		return
+	var anim_name: String = PREVIEW_ANIMS[idx]
+	if not ap.has_animation(anim_name):
+		return
+
+	_playing_anim = true
+	ap.play(anim_name)
+	var anim := ap.get_animation(anim_name)
+	if anim:
+		get_tree().create_timer(anim.length).timeout.connect(_on_anim_done)
+
+
+func _on_anim_done() -> void:
+	_playing_anim = false
 
 
 # ═══════════════════════════════════════════
@@ -396,6 +488,8 @@ func _rebuild() -> void:
 	for child in _root.get_children():
 		child.queue_free()
 	_slot_panels.clear()
+	_anim_buttons.clear()
+	_preview_model = null
 	_refresh_saves()
 	_build_ui()
 	_create_preview()
@@ -428,6 +522,14 @@ func _layout_ui() -> void:
 	var path_row1_y: float = path_bottom + 10.0
 	var path_row2_y: float = path_row1_y + 22.0
 
+	# 动画预览区
+	const ANIM_COLS := 3
+	var anim_btn_w: float = 73.0
+	var anim_btn_h: float = 18.0
+	var anim_gap: float = 3.0
+	var anim_start_y: float = PREVIEW_Y + PREVIEW_SIZE + 50.0
+	var anim_left_x: float = PREVIEW_X - 10.0
+
 	for child in _root.get_children():
 		if child is Label and child.text.begins_with("选择存档"):
 			child.position = Vector2((REF.x - child.size.x) / 2.0, 85.0)
@@ -435,7 +537,20 @@ func _layout_ui() -> void:
 			child.position = Vector2((REF.x - child.size.x) / 2.0, path_bottom)
 		elif child is Label and child.name == "PathLabel":
 			child.position = Vector2(SLOT_X, path_row1_y)
+		elif child is Label and child.name == "AnimLabel":
+			child.position = Vector2(anim_left_x, anim_start_y)
 		elif child is Button and child.name == "PathBtn":
 			child.position = Vector2(SLOT_X, path_row2_y)
 		elif child is Button and child.name == "ResetPathBtn":
 			child.position = Vector2(SLOT_X + 115, path_row2_y)
+		elif child is Button and child.name == "QuitBtn":
+			child.position = Vector2((REF.x - child.size.x) / 2.0, path_row2_y + 50.0)
+
+	# 动画按钮
+	for i in range(_anim_buttons.size()):
+		var row: int = i / ANIM_COLS
+		var col: int = i % ANIM_COLS
+		_anim_buttons[i].position = Vector2(
+			anim_left_x + col * (anim_btn_w + anim_gap),
+			anim_start_y + 22.0 + row * (anim_btn_h + anim_gap)
+		)
