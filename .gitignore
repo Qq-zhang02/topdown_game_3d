@@ -1,0 +1,14 @@
+# Godot 导入缓存（最大头，重新打开项目会自动生成）
+.godot/
+
+# 导出产物
+build/
+exports/
+
+# 用户数据
+user/
+
+# 系统文件
+Thumbs.db
+*.tmp
+*.log
