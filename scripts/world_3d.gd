@@ -87,6 +87,7 @@ func _on_game_started(model_path: String, skin_path: String, save_slot: int) -> 
 	_create_menu()
 	_create_day_night_system()
 	_create_time_display()
+	_create_hp_bar()
 	_game_started = true
 	# 创建自动存档提示
 	_create_save_toast()
@@ -530,6 +531,7 @@ func _create_day_night_system() -> void:
 	_day_night.set("moon_light", $MoonLight)
 	_day_night.set("environment", $WorldEnv.environment)
 	_day_night.set("time_scale", 60.0)
+	_day_night.add_to_group("day_night_system")
 	add_child(_day_night)
 
 
@@ -571,6 +573,62 @@ func _create_time_display() -> void:
 	updater.set("day_night", _day_night)
 	updater.set("label", time_label)
 	add_child(updater)
+
+
+# ═══════════════════════════════════════════
+# 玩家血条 HUD
+# ═══════════════════════════════════════════
+
+func _create_hp_bar() -> void:
+	var layer := CanvasLayer.new()
+	layer.name = "HPBarLayer"
+	layer.layer = 40
+	add_child(layer)
+
+	var bg := Panel.new()
+	bg.name = "HPBg"
+	bg.position = Vector2(15, 280)
+	bg.size = Vector2(220, 26)
+	var ts := StyleBoxFlat.new()
+	ts.bg_color = Color(0, 0, 0, 0.55)
+	ts.corner_radius_top_left = 6; ts.corner_radius_top_right = 6
+	ts.corner_radius_bottom_left = 6; ts.corner_radius_bottom_right = 6
+	bg.add_theme_stylebox_override("panel", ts)
+	layer.add_child(bg)
+
+	var fill := ColorRect.new()
+	fill.name = "HPFill"
+	fill.position = Vector2(18, 283)
+	fill.size = Vector2(214, 20)
+	fill.color = Color(0.2, 0.85, 0.2)
+	layer.add_child(fill)
+
+	var label := Label.new()
+	label.name = "HPLabel"
+	label.position = Vector2(18, 283)
+	label.size = Vector2(214, 20)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 13)
+	label.add_theme_color_override("font_color", Color.WHITE)
+	label.text = "100 / 100"
+	layer.add_child(label)
+
+	var health := _player.get_health()
+	health.damaged.connect(_on_hp_changed.bind(fill, label))
+	_on_hp_changed(0.0, Vector3.ZERO, fill, label)
+
+
+func _on_hp_changed(_amount: float, _from: Vector3, fill: ColorRect, label: Label) -> void:
+	var health := _player.get_health()
+	var ratio := clampf(health.hp / health.max_hp, 0.0, 1.0)
+	fill.size.x = 214.0 * ratio
+
+	if ratio > 0.5:
+		fill.color = Color(0.2, 0.85, 0.2).lerp(Color(0.85, 0.85, 0.1), (1.0 - ratio) * 2.0)
+	else:
+		fill.color = Color(0.85, 0.85, 0.1).lerp(Color(0.85, 0.15, 0.1), (0.5 - ratio) * 2.0)
+
+	label.text = "%d / %d" % [int(ceil(health.hp)), int(health.max_hp)]
 
 
 # ═══════════════════════════════════════════
