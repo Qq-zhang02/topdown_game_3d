@@ -20,6 +20,8 @@ var _save_toast: Label                        # 自动存档提示标签
 var _hp_fill: ColorRect                       # 血条填充引用
 var _hp_label: Label                          # 血条文本引用
 var _loading_save: bool = false               # 是否正在加载存档（跳过初始保存）
+var _resource_positions: Array[Dictionary] = []  # 资源节点位置存档 [{kind, pos_x, pos_z}]
+var _regen_timer: float = 0.0                    # 资源重生计时器
 
 
 func _ready() -> void:
@@ -81,7 +83,8 @@ func _on_game_started(model_path: String, skin_path: String, save_slot: int) -> 
 	_create_player(model_path, skin_path)
 	_ocean.setup(_player, _player.get_health())
 	_create_day_night_system()       # ★ 必须在动物之前创建
-	_create_resource_nodes()
+	if not _loading_save:
+		_create_resource_nodes()
 	_create_animals()
 	_create_camera(_player)
 	_create_minimap(_player)
@@ -284,8 +287,53 @@ func _create_resource_nodes() -> void:
 			if found:
 				var node = ResNodeScript.spawn(self, kind, pos)
 				register_occupied(node.occupied_aabb)
-				# 同时让动物生成器避开
 				_obstacle_data.append({"position": pos, "size": Vector3(1.5, 2.0, 1.5)})
+				_resource_positions.append({"kind": kind, "pos_x": pos.x, "pos_z": pos.z})
+
+
+## 从存档数据生成资源节点
+func _spawn_resources_from_save() -> void:
+	var ResNodeScript := load("res://scripts/world/resource_node.gd")
+	for r in _resource_positions:
+		var kind: String = r.get("kind", "tree")
+		var pos := Vector3(r.get("pos_x", 0.0), 0.0, r.get("pos_z", 0.0))
+		if is_area_free(pos, Vector2(1.0, 1.0)):
+			var node = ResNodeScript.spawn(self, kind, pos)
+			register_occupied(node.occupied_aabb)
+			_obstacle_data.append({"position": pos, "size": Vector3(1.5, 2.0, 1.5)})
+
+
+## 白天资源缓慢重生
+func _try_regen_resource() -> void:
+	if not _day_night:
+		return
+	var hours: float = _day_night.get_time_hours()
+	# 只在白天 (6:00-19:00) 重生
+	if hours < 6.0 or hours >= 19.0:
+		return
+	# 资源总数控制
+	if _resource_positions.size() >= 50:
+		return
+
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var kind := "tree" if rng.randf() < 0.6 else "rock"
+	var ResNodeScript := load("res://scripts/world/resource_node.gd")
+
+	for attempt in range(30):
+		var pos := Vector3(
+			rng.randf_range(-WORLD_HALF + 4.0, WORLD_HALF - 4.0),
+			0,
+			rng.randf_range(-WORLD_HALF + 4.0, WORLD_HALF - 4.0)
+		)
+		if not _player or pos.distance_to(_player.global_position) < 8.0:
+			continue
+		if is_area_free(pos, Vector2(1.0, 1.0)):
+			var node = ResNodeScript.spawn(self, kind, pos)
+			register_occupied(node.occupied_aabb)
+			_obstacle_data.append({"position": pos, "size": Vector3(1.5, 2.0, 1.5)})
+			_resource_positions.append({"kind": kind, "pos_x": pos.x, "pos_z": pos.z})
+			return
 
 
 # ═══════════════════════════════════════════
@@ -470,6 +518,15 @@ func _create_inventory_ui() -> void:
 	ui.name = "InventoryUI"
 	add_child(ui)
 	ui.setup(_player.get_inventory())
+	ui.item_used.connect(_on_item_used)
+
+
+func _on_item_used(item: Resource, _slot: int) -> void:
+	var health: Health = _player.get_health() as Health
+	if health:
+		var heal: float = item.get("heal_amount")
+		health.heal(heal)
+		_update_hp_bar()
 
 
 # ═══════════════════════════════════════════
@@ -653,6 +710,10 @@ func _process(delta: float) -> void:
 	if _game_started:
 		_play_time += delta
 		_auto_save_timer += delta
+		_regen_timer += delta
+		if _regen_timer >= 30.0:
+			_regen_timer = 0.0
+			_try_regen_resource()
 		if _auto_save_timer >= 60.0:
 			_auto_save_timer = 0.0
 			_save_current_game()
@@ -727,6 +788,7 @@ func _collect_world_data() -> Dictionary:
 	return {
 		"day_time": day_time,
 		"buildings": buildings,
+		"resources": _resource_positions,
 	}
 
 
@@ -823,6 +885,13 @@ func _restore_from_save(data: Dictionary) -> void:
 	if _day_night and wd.has("day_time"):
 		_day_night.set("game_time", float(wd["day_time"]))
 		print("[World3D] 昼夜恢复: ", wd["day_time"])
+
+	# 资源节点：用存档位置取代随机生成
+	var resources: Array = wd.get("resources", [])
+	if not resources.is_empty():
+		_resource_positions = resources
+		_spawn_resources_from_save()
+		print("[World3D] 资源恢复: %d 个" % resources.size())
 
 	# 建筑
 	var bld_count := 0

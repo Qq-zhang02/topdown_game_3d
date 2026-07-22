@@ -10,4 +10,5 @@ enum ItemType { MATERIAL, EQUIPMENT, WEAPON }
 @export_multiline var description: String = ""
 @export var item_type: ItemType = ItemType.MATERIAL
 @export var max_stack: int = 99
+@export var heal_amount: float = 0.0  # >0 表示可食用回血
 @export var ui_color: Color = Color(0.7, 0.7, 0.7)  # 背包格子里的底色（无图标时代替图标）

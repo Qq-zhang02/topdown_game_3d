@@ -9,4 +9,5 @@ display_name = "生肉"
 description = "猎杀动物获得的肉"
 item_type = 0
 max_stack = 99
+heal_amount = 15.0
 ui_color = Color(0.75, 0.3, 0.3, 1)

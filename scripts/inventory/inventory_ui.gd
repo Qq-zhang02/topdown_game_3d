@@ -1,6 +1,8 @@
 extends CanvasLayer
 class_name InventoryUI
-## 背包界面：8x4 格子，Tab 开关，鼠标拖拽整理
+## 背包界面：8x4 格子，Tab 开关，鼠标拖拽整理，右键使用物品
+
+signal item_used(item_data: Resource, slot_index: int)
 
 const SlotClass := preload("res://scripts/inventory/inventory_slot.gd")
 
@@ -43,6 +45,18 @@ func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("inventory_toggle"):
 		visible = not visible
 		get_viewport().set_input_as_handled()
+
+	if not visible:
+		return
+
+	# 右键使用物品
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+		var idx := _get_hovered_slot_index()
+		if idx >= 0:
+			var st := _inventory.get_stack(idx)
+			if st and st.item.get("heal_amount") > 0.0:
+				_consume_slot(idx, st)
+				get_viewport().set_input_as_handled()
 
 
 func _build() -> void:
@@ -148,3 +162,28 @@ func _refresh() -> void:
 			count_label.text = ""
 			bg.bg_color = Color(0.14, 0.14, 0.16, 0.70)
 			bg.border_color = Color(0.35, 0.35, 0.40, 0.4)
+
+			# 可食用物品标记
+			if st and st.item.get("heal_amount") > 0.0:
+				count_label.text = ("♥%d  x%d" % [int(st.item.get("heal_amount")), st.count]) if st.count > 1 else ("♥%d" % int(st.item.get("heal_amount")))
+
+
+func _get_hovered_slot_index() -> int:
+	var mp := _panel.get_local_mouse_position()
+	if mp.x < PANEL_PAD or mp.y < TITLE_H + PANEL_PAD:
+		return -1
+	for i in range(_slots.size()):
+		var slot := _slots[i]
+		var r := Rect2(slot.position, slot.size)
+		if r.has_point(mp):
+			return i
+	return -1
+
+
+func _consume_slot(idx: int, st: ItemStack) -> void:
+	var heal: float = st.item.get("heal_amount")
+	st.count -= 1
+	if st.count <= 0:
+		_inventory.slots[idx] = null
+	_inventory.changed.emit()
+	item_used.emit(st.item, idx)
