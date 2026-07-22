@@ -23,18 +23,18 @@ const PREVIEW_ANIMS := [
 ]
 
 # 布局常量（1920x1080 参考）
-const PREVIEW_X: float = 880.0
+const PREVIEW_X: float = 1120.0
 const PREVIEW_Y: float = 140.0
-const PREVIEW_SIZE: float = 240.0
-const SLOT_X: float = 300.0
+const PREVIEW_SIZE: float = 280.0
+const SLOT_X: float = 460.0
 const SLOT_Y: float = 140.0
-const SLOT_W: float = 520.0
-const SLOT_H: float = 100.0
-const SLOT_GAP: float = 14.0
-const ANIM_COLS := 3
-const ANIM_BTN_W: float = 73.0
+const SLOT_W: float = 580.0
+const SLOT_H: float = 108.0
+const SLOT_GAP: float = 16.0
+const ANIM_COLS := 4
+const ANIM_BTN_W: float = 64.0
 const ANIM_BTN_H: float = 18.0
-const ANIM_GAP: float = 3.0
+const ANIM_GAP: float = 4.0
 
 var _root: Control
 var _slot_panels: Array[Panel] = []
