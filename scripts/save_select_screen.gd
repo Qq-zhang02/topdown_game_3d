@@ -22,19 +22,19 @@ const PREVIEW_ANIMS := [
 	"wheelchair-move-forward", "wheelchair-move-back", "wheelchair-move-left", "wheelchair-move-right",
 ]
 
-# 布局常量（1920x1080 参考，左右对称居中）
-const PREVIEW_X: float = 1090.0
+# 布局常量（1920x1080 参考，左右对称居中，窄边距）
+const PREVIEW_X: float = 1140.0
 const PREVIEW_Y: float = 140.0
-const PREVIEW_SIZE: float = 400.0
-const SLOT_X: float = 400.0
+const PREVIEW_SIZE: float = 600.0
+const SLOT_X: float = 180.0
 const SLOT_Y: float = 140.0
-const SLOT_W: float = 600.0
-const SLOT_H: float = 112.0
-const SLOT_GAP: float = 16.0
+const SLOT_W: float = 850.0
+const SLOT_H: float = 116.0
+const SLOT_GAP: float = 18.0
 const ANIM_COLS := 4
-const ANIM_BTN_W: float = 95.0
+const ANIM_BTN_W: float = 142.0
 const ANIM_BTN_H: float = 22.0
-const ANIM_GAP: float = 6.0
+const ANIM_GAP: float = 8.0
 const ANIM_AREA_X: float = PREVIEW_X - 10.0  # 与预览框左对齐
 
 var _root: Control
@@ -145,7 +145,7 @@ func _build_ui() -> void:
 		var info_label := Label.new()
 		info_label.name = "InfoLabel"
 		info_label.position = Vector2(18, 44)
-		info_label.size = Vector2(430, 42)
+		info_label.size = Vector2(680, 42)
 		info_label.add_theme_font_size_override("font_size", 13)
 
 		if empty:
