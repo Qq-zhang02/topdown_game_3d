@@ -116,3 +116,23 @@ func _spawn_animal(model_name: String, pos: Vector3, scale_val: float, rot_y: fl
 	behavior.set("hop_up", randf_range(2.5, 5.0))
 	behavior.set("world_boundary", _world_half - 1.0)  # 边界安全距离
 	body.add_child(behavior)
+
+	# 血量 + 可被近战攻击 + 死亡掉落
+	body.add_to_group("damageable")
+	var HealthScript := load("res://scripts/combat/health.gd")
+	var health := Node.new()
+	health.set_script(HealthScript)
+	health.name = "Health"
+	health.set("max_hp", 30.0)
+	body.add_child(health)
+	health.died.connect(_on_animal_died.bind(body))
+
+
+func _on_animal_died(body: RigidBody3D) -> void:
+	var pos := body.global_position
+	var ItemDBScript := load("res://scripts/core/item_db.gd")
+	var PickupScript := load("res://scripts/combat/pickup.gd")
+	var meat: Resource = ItemDBScript.get_item("meat")
+	if meat:
+		PickupScript.spawn(self, meat, randi_range(1, 2), pos)
+	body.queue_free()

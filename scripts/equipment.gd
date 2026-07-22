@@ -1,12 +1,10 @@
-extends Resource
+extends "res://scripts/core/item_data.gd"
 class_name Equipment
-## 装备数据资源：定义一件装备的所有属性
+## 装备数据资源：光源类装备（手电筒/火把等），继承物品基类
 
 enum LightType { NONE, SPOT, OMNI }
 
-# ── 基本信息 ──
-@export var id: String = ""
-@export var display_name: String = ""
+# ── 装备状态 ──
 @export var equipped: bool = true  # 是否已装备（在切换循环中）
 
 # ── 光源类型 ──
@@ -28,3 +26,8 @@ enum LightType { NONE, SPOT, OMNI }
 # ── 点光源专用 ──
 @export var omni_range: float = 5.0
 @export var omni_attenuation: float = 0.5
+
+
+func _init() -> void:
+	item_type = ItemType.EQUIPMENT
+	max_stack = 1

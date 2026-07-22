@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="BuildingData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/building/building_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "foundation"
+display_name = "木地基"
+description = "一块平稳的木制平台"
+size = Vector3(3, 0.2, 3)
+color = Color(0.6, 0.45, 0.25, 1)
+cost = {
+"wood": 6
+}

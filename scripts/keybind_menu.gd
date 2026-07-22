@@ -11,6 +11,9 @@ const ACTIONS := [
 	{"id": "move_right",  "label": "右移",     "default": KEY_D},
 	{"id": "cycle_equipment",  "label": "切换装备", "default": KEY_F},
 	{"id": "jump",        "label": "跳跃",     "default": KEY_SPACE},
+	{"id": "inventory_toggle", "label": "背包", "default": KEY_TAB},
+	{"id": "build_menu",  "label": "建造菜单", "default": KEY_B},
+	{"id": "build_rotate", "label": "旋转建筑", "default": KEY_R},
 	{"id": "pause",       "label": "暂停",     "default": KEY_ESCAPE},
 ]
 
@@ -110,7 +113,7 @@ func _build_ui() -> void:
 	_root.add_child(bg)
 
 	_panel = Panel.new()
-	_panel.size = Vector2(400, 410)
+	_panel.size = Vector2(400, 545)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.12, 0.12, 0.14, 0.95)
 	style.border_width_bottom = 2; style.border_width_left = 2
@@ -231,5 +234,5 @@ func _layout_ui() -> void:
 	var scale: float = clampf(minf(vs.x / REF.x, vs.y / REF.y), 0.6, 1.6)
 	_panel.scale = Vector2(scale, scale)
 	var pw: float = 400.0 * scale
-	var ph: float = 410.0 * scale
+	var ph: float = 545.0 * scale
 	_panel.position = Vector2((vs.x - pw) / 2.0, (vs.y - ph) / 2.0)

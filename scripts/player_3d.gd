@@ -10,7 +10,7 @@ enum AnimState { IDLE, RUN, JUMP }
 var _model_path: String = "res://models/character/character-archer.glb"
 var _skin_path: String = "res://models/character/colormap.png"
 
-@export var speed: float = 9.0
+@export var speed: float = 5.0
 @export var jump_velocity: float = 15.0
 @export var gravity: float = 35.0
 @export var vision_range: float = 5.0  # 视力属性，瞄准时摄像机最大偏移距离
@@ -20,6 +20,11 @@ var _model_root: Node3D
 var _anim_player: AnimationPlayer
 var _anim_state: AnimState = AnimState.IDLE
 var _anim_map: Dictionary = {}  # "idle"→实际动画名, "run"→..., "jump"→...
+
+var _health: Node
+var _inventory: Node
+var _dead: bool = false
+var _attacking: bool = false
 
 
 func set_model_path(path: String) -> void:
@@ -34,6 +39,7 @@ func _ready() -> void:
 	_create_model()
 	_create_collision()
 	_create_lights_and_equipment()
+	_create_survival()
 	_setup_animations()
 
 
@@ -158,25 +164,33 @@ func _setup_animations() -> void:
 
 	for a in anims:
 		var lower := a.to_lower()
-		if "idle" in lower:
+		if "attack-melee" in lower:
+			if not _anim_map.has("attack"):
+				_anim_map["attack"] = a
+		elif "die" in lower and "idle" not in lower:
+			_anim_map["die"] = a
+		elif "idle" in lower:
 			_anim_map["idle"] = a
 		elif "run" in lower or "walk" in lower:
 			_anim_map["run"] = a
 		elif "jump" in lower:
 			_anim_map["jump"] = a
 
-	# 所有动画设为循环
+	# 移动动画循环，攻击/死亡不循环
 	for key in _anim_map:
 		var anim := _anim_player.get_animation(_anim_map[key])
 		if anim:
-			anim.loop_mode = Animation.LOOP_LINEAR
+			if key == "attack" or key == "die":
+				anim.loop_mode = Animation.LOOP_NONE
+			else:
+				anim.loop_mode = Animation.LOOP_LINEAR
 
 	if _anim_map.has("idle"):
 		_anim_player.play(_anim_map["idle"])
 
 
 func _update_animation(input_length: float) -> void:
-	if not _anim_player:
+	if not _anim_player or _attacking or _dead:
 		return
 
 	var new_state: AnimState
@@ -201,6 +215,26 @@ func _update_animation(input_length: float) -> void:
 		AnimState.JUMP:
 			if _anim_map.has("jump"):
 				_anim_player.play(_anim_map["jump"])
+
+
+## 近战挥击动画（由 MeleeController 调用）
+func play_attack() -> void:
+	if _dead or _attacking:
+		return
+	if not _anim_player or not _anim_map.has("attack"):
+		return
+	_attacking = true
+	_anim_player.play(_anim_map["attack"])
+	if not _anim_player.animation_finished.is_connected(_on_anim_finished):
+		_anim_player.animation_finished.connect(_on_anim_finished)
+
+
+func _on_anim_finished(anim_name: String) -> void:
+	if _anim_map.has("attack") and anim_name == _anim_map["attack"]:
+		_attacking = false
+		_anim_state = AnimState.IDLE
+		if not _dead and _anim_map.has("idle"):
+			_anim_player.play(_anim_map["idle"])
 
 
 # ═══════════════════════════════════════════
@@ -229,6 +263,61 @@ func _create_lights_and_equipment() -> void:
 	_equipment_mgr.add_equipment(_make_torch())
 
 
+# ═══════════════════════════════════════════
+# 生存系统：血量 / 背包 / 近战
+# ═══════════════════════════════════════════
+
+func _create_survival() -> void:
+	var HealthScript := load("res://scripts/combat/health.gd")
+	_health = Node.new()
+	_health.set_script(HealthScript)
+	_health.name = "Health"
+	_health.set("max_hp", 100.0)
+	add_child(_health)
+	_health.died.connect(_on_died)
+
+	var InvScript := load("res://scripts/inventory/inventory.gd")
+	_inventory = Node.new()
+	_inventory.set_script(InvScript)
+	_inventory.name = "Inventory"
+	add_child(_inventory)
+
+	var MeleeScript := load("res://scripts/combat/melee_controller.gd")
+	var melee := Node.new()
+	melee.set_script(MeleeScript)
+	melee.name = "MeleeController"
+	add_child(melee)
+
+	# 初始物资（用于验证各系统）
+	var ItemDBScript := load("res://scripts/core/item_db.gd")
+	_inventory.add_item(ItemDBScript.get_item("wood"), 12)
+	_inventory.add_item(ItemDBScript.get_item("stone"), 8)
+	var sword: Resource = ItemDBScript.get_item("sword_wood")
+	if sword:
+		_equipment_mgr.add_equipment(sword)
+
+
+func get_health() -> Node:
+	return _health
+
+
+func get_inventory() -> Node:
+	return _inventory
+
+
+func is_dead() -> bool:
+	return _dead
+
+
+func _on_died() -> void:
+	_dead = true
+	velocity = Vector3.ZERO
+	set_deferred("collision_layer", 0)
+	set_deferred("collision_mask", 0)
+	if _anim_player and _anim_map.has("die"):
+		_anim_player.play(_anim_map["die"])
+
+
 func _make_flashlight() -> Resource:
 	var eq := EquipmentClass.new()
 	eq.set("id", "flashlight")
@@ -253,7 +342,7 @@ func _make_torch() -> Resource:
 	eq.set("display_name", "火把")
 	eq.set("light_type", EquipmentClass.LightType.OMNI)
 	eq.set("position_offset", Vector3(0, 1.6, 0.3))
-	eq.set("omni_range", 12.0)
+	eq.set("omni_range", 6.0)
 	eq.set("omni_attenuation", 0.8)
 	eq.set("light_color", Color(1.0, 0.55, 0.15))
 	eq.set("light_energy", 5.0)
@@ -264,6 +353,8 @@ func _make_torch() -> Resource:
 
 
 func _input(event: InputEvent) -> void:
+	if _dead:
+		return
 	if event.is_action_pressed("cycle_equipment"):
 		_equipment_mgr.cycle_next()
 
@@ -296,6 +387,9 @@ func is_aiming() -> bool:
 
 
 func _physics_process(delta: float) -> void:
+	if _dead:
+		return
+
 	if not is_on_floor():
 		velocity.y -= gravity * delta
 

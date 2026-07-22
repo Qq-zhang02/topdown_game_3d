@@ -40,8 +40,9 @@ func _get_sun_elevation_angle() -> float:
 
 
 func _get_sun_height_factor() -> float:
-	# 0 = 地平线以下, 1 = 正午最高
-	return max(0.0, sin(deg_to_rad(_get_sun_elevation_angle() + 90.0)))
+	# sin((hours-6)*15°): 6点=0, 12点=1, 18点=0
+	var hours: float = get_time_hours()
+	return max(0.0, sin(deg_to_rad((hours - DAWN_HOUR) * 15.0)))
 
 
 func _update_sun() -> void:

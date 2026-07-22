@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="BuildingData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/building/building_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "campfire"
+display_name = "篝火"
+description = "照亮黑夜，温暖人心"
+size = Vector3(1, 0.5, 1)
+color = Color(0.45, 0.28, 0.12, 1)
+cost = {
+"wood": 5,
+"stone": 3
+}
+emits_light = true
+light_color = Color(1, 0.6, 0.2, 1)
+light_energy = 3.5
+light_range = 9.0

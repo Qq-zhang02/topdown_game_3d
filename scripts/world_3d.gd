@@ -7,8 +7,10 @@ const MINIMAP_SIZE := Vector2(220, 220)
 
 var _obstacle_positions: Array[Vector3] = []
 var _obstacle_data: Array[Dictionary] = []
+var _occupied: Array[AABB] = []  # 障碍物/资源/建筑占地区域（建造系统用）
 var _day_night: Node
 var _player: CharacterBody3D
+var _ocean: Node3D
 
 
 func _ready() -> void:
@@ -29,14 +31,20 @@ func _on_game_started(model_path: String, skin_path: String) -> void:
 	_create_lighting()
 	_create_ground()
 	_create_obstacles()
-	_create_boundary()
+	_create_ocean()
 	_create_player(model_path, skin_path)
+	_ocean.setup(_player, _player.get_health())
+	_create_resource_nodes()
 	_create_animals()
 	_create_camera(_player)
 	_create_minimap(_player)
 	_create_equipment_hud(_player)
+	_create_inventory_ui()
+	_create_build_system()
+	_create_death_screen()
 	_create_menu()
 	_create_day_night_system()
+	_create_time_display()
 
 
 # ═══════════════════════════════════════════
@@ -119,41 +127,16 @@ func _make_noise_texture(frequency: float, seed: int) -> NoiseTexture2D:
 
 
 # ═══════════════════════════════════════════
-# 边界墙
+# 海洋（地图边界：落水持续掉血致死）
 # ═══════════════════════════════════════════
 
-func _create_boundary() -> void:
-	var hw := WORLD_HALF
-	var wall_height := 3.0
-	var wall_thickness := 0.5
-
-	for i in range(4):
-		var wall := MeshInstance3D.new()
-		wall.name = "Wall_%d" % i
-		var box := BoxMesh.new()
-		match i:
-			0: box.size = Vector3(hw * 2, wall_height, wall_thickness); wall.position = Vector3(0, wall_height / 2, -hw)
-			1: box.size = Vector3(hw * 2, wall_height, wall_thickness); wall.position = Vector3(0, wall_height / 2, hw)
-			2: box.size = Vector3(wall_thickness, wall_height, hw * 2); wall.position = Vector3(-hw, wall_height / 2, 0)
-			3: box.size = Vector3(wall_thickness, wall_height, hw * 2); wall.position = Vector3(hw, wall_height / 2, 0)
-
-		wall.mesh = box
-		var wall_mat := StandardMaterial3D.new()
-		wall_mat.albedo_color = Color(0.5, 0.35, 0.2)
-		wall_mat.roughness = 0.75
-		wall_mat.metallic = 0.1
-		wall.material_override = wall_mat
-		add_child(wall)
-
-		var sb := StaticBody3D.new()
-		sb.name = "WallBody_%d" % i
-		sb.position = wall.position
-		var sc := CollisionShape3D.new()
-		var shp := BoxShape3D.new()
-		shp.size = box.size
-		sc.shape = shp
-		sb.add_child(sc)
-		add_child(sb)
+func _create_ocean() -> void:
+	var OceanScript := load("res://scripts/world/ocean.gd")
+	_ocean = Node3D.new()
+	_ocean.set_script(OceanScript)
+	_ocean.name = "Ocean"
+	add_child(_ocean)
+	_ocean.build(WORLD_HALF)
 
 
 # ═══════════════════════════════════════════
@@ -209,6 +192,7 @@ func _create_obstacles() -> void:
 
 		_obstacle_positions.append(pos)
 		_obstacle_data.append({"position": pos, "size": Vector3(w, h, d)})
+		_occupied.append(AABB(pos - Vector3(w, h, d) * 0.5, Vector3(w, h, d)))
 
 
 func _make_material_presets() -> Array[StandardMaterial3D]:
@@ -219,6 +203,112 @@ func _make_material_presets() -> Array[StandardMaterial3D]:
 	var metal := StandardMaterial3D.new(); metal.roughness = 0.2; metal.metallic = 0.9; metal.metallic_specular = 0.5; presets.append(metal)
 	return presets
 
+
+# ═══════════════════════════════════════════
+# 资源节点（树/石头，近战采集）
+# ═══════════════════════════════════════════
+
+func _create_resource_nodes() -> void:
+	var ResNodeScript := load("res://scripts/world/resource_node.gd")
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var kinds := {"tree": 25, "rock": 15}
+
+	for kind in kinds:
+		for i in range(kinds[kind]):
+			var pos := Vector3.ZERO
+			var found := false
+			for attempt in range(60):
+				pos = Vector3(
+					rng.randf_range(-WORLD_HALF + 4.0, WORLD_HALF - 4.0),
+					0,
+					rng.randf_range(-WORLD_HALF + 4.0, WORLD_HALF - 4.0)
+				)
+				if is_area_free(pos, Vector2(1.0, 1.0)) and pos.distance_to(_player.global_position) > 6.0:
+					found = true
+					break
+			if found:
+				var node = ResNodeScript.spawn(self, kind, pos)
+				register_occupied(node.occupied_aabb)
+				# 同时让动物生成器避开
+				_obstacle_data.append({"position": pos, "size": Vector3(1.5, 2.0, 1.5)})
+
+
+# ═══════════════════════════════════════════
+# 建造系统：占地查询 / 放置
+# ═══════════════════════════════════════════
+
+func register_occupied(aabb: AABB) -> void:
+	_occupied.append(aabb)
+
+
+func unregister_occupied(aabb: AABB) -> void:
+	_occupied.erase(aabb)
+
+
+## 检查 center 周围 half(XZ半尺寸) 的区域是否可以放置建筑
+func is_area_free(center: Vector3, half: Vector2) -> bool:
+	if abs(center.x) + half.x > WORLD_HALF - 1.0:
+		return false
+	if abs(center.z) + half.y > WORLD_HALF - 1.0:
+		return false
+	var box := AABB(
+		Vector3(center.x - half.x, 0.0, center.z - half.y),
+		Vector3(half.x * 2.0, 8.0, half.y * 2.0)
+	)
+	for o in _occupied:
+		if box.intersects(o):
+			return false
+	if _player:
+		var d := Vector2(
+			center.x - _player.global_position.x,
+			center.z - _player.global_position.z
+		).length()
+		if d < 1.2:
+			return false
+	return true
+
+
+## 放置建筑（由 BuildController 调用，材料已在控制器中扣除）
+func place_building(data: Resource, pos: Vector3, rot_y: float) -> void:
+	var body := StaticBody3D.new()
+	body.name = "Building_" + data.id
+	body.collision_layer = 1
+	body.position = pos
+	body.rotation.y = rot_y
+	add_child(body)
+
+	var mesh := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = data.size
+	mesh.mesh = box
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = data.color
+	mat.roughness = 0.8
+	mesh.material_override = mat
+	body.add_child(mesh)
+
+	var col := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = data.size
+	col.shape = shape
+	body.add_child(col)
+
+	if data.emits_light:
+		var light := OmniLight3D.new()
+		light.light_color = data.light_color
+		light.light_energy = data.light_energy
+		light.omni_range = data.light_range
+		light.position = Vector3(0, data.size.y * 0.5 + 0.6, 0)
+		body.add_child(light)
+
+	var half := Vector2(data.size.x, data.size.z) * 0.5
+	if int(round(rad_to_deg(rot_y))) % 180 != 0:
+		half = Vector2(data.size.z, data.size.x) * 0.5
+	register_occupied(AABB(
+		Vector3(pos.x - half.x, 0.0, pos.z - half.y),
+		Vector3(half.x * 2.0, data.size.y, half.y * 2.0)
+	))
 
 # ═══════════════════════════════════════════
 # 玩家
@@ -309,6 +399,45 @@ func _create_equipment_hud(player_node: Node3D) -> void:
 
 
 # ═══════════════════════════════════════════
+# 背包界面
+# ═══════════════════════════════════════════
+
+func _create_inventory_ui() -> void:
+	var UIScript := load("res://scripts/inventory/inventory_ui.gd")
+	var ui := CanvasLayer.new()
+	ui.set_script(UIScript)
+	ui.name = "InventoryUI"
+	add_child(ui)
+	ui.setup(_player.get_inventory())
+
+
+# ═══════════════════════════════════════════
+# 建造系统
+# ═══════════════════════════════════════════
+
+func _create_build_system() -> void:
+	var BCScript := load("res://scripts/building/build_controller.gd")
+	var bc := Node.new()
+	bc.set_script(BCScript)
+	bc.name = "BuildController"
+	add_child(bc)
+	bc.setup(_player, _player.get_inventory(), self)
+
+
+# ═══════════════════════════════════════════
+# 死亡界面
+# ═══════════════════════════════════════════
+
+func _create_death_screen() -> void:
+	var DSScript := load("res://scripts/world/death_screen.gd")
+	var ds := CanvasLayer.new()
+	ds.set_script(DSScript)
+	ds.name = "DeathScreen"
+	add_child(ds)
+	ds.setup(_player.get_health())
+
+
+# ═══════════════════════════════════════════
 # 菜单
 # ═══════════════════════════════════════════
 
@@ -347,3 +476,43 @@ func _create_day_night_system() -> void:
 	_day_night.set("environment", $WorldEnv.environment)
 	_day_night.set("time_scale", 60.0)
 	add_child(_day_night)
+
+
+# ═══════════════════════════════════════════
+# 时间显示
+# ═══════════════════════════════════════════
+
+func _create_time_display() -> void:
+	var layer := CanvasLayer.new()
+	layer.name = "TimeLayer"
+	layer.layer = 40
+	add_child(layer)
+
+	var bg := Panel.new()
+	bg.name = "TimeBg"
+	bg.position = Vector2(15, 245)
+	bg.size = Vector2(72, 28)
+	var ts := StyleBoxFlat.new()
+	ts.bg_color = Color(0, 0, 0, 0.55)
+	ts.corner_radius_top_left = 6; ts.corner_radius_top_right = 6
+	ts.corner_radius_bottom_left = 6; ts.corner_radius_bottom_right = 6
+	bg.add_theme_stylebox_override("panel", ts)
+	layer.add_child(bg)
+
+	var time_label := Label.new()
+	time_label.name = "TimeLabel"
+	time_label.position = Vector2(23, 248)
+	time_label.size = Vector2(56, 22)
+	time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	time_label.add_theme_font_size_override("font_size", 14)
+	time_label.add_theme_color_override("font_color", Color(0.9, 0.9, 1.0))
+	time_label.text = "06:00"
+	layer.add_child(time_label)
+
+	# 每帧更新时间
+	var updater := Node.new()
+	updater.name = "TimeUpdater"
+	updater.set_script(load("res://scripts/time_display.gd"))
+	updater.set("day_night", _day_night)
+	updater.set("label", time_label)
+	add_child(updater)

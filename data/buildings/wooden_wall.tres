@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="BuildingData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/building/building_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "wooden_wall"
+display_name = "木墙"
+description = "一堵朴素的木墙"
+size = Vector3(3, 2.5, 0.3)
+color = Color(0.55, 0.38, 0.2, 1)
+cost = {
+"wood": 4
+}

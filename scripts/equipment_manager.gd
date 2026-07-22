@@ -163,7 +163,14 @@ func _apply_current() -> void:
 
 	_turn_off_all()
 
-	var light_type: int = eq.get("light_type")
+	# 非光源装备（武器等）没有 light_type 属性，get 返回 null → 只关灯
+	var light_type = eq.get("light_type")
+	if light_type == null:
+		var name_str: String = eq.get("display_name")
+		equipment_changed.emit(name_str)
+		equipment_cycled.emit(_current_index, name_str)
+		return
+
 	var LIGHT_SPOT: int = EquipmentScript.LightType.SPOT
 	var LIGHT_OMNI: int = EquipmentScript.LightType.OMNI
 
