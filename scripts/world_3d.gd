@@ -1040,6 +1040,12 @@ func _restore_from_save(data: Dictionary) -> void:
 		)
 		var rot_y: float = bd.get("rot_y", 0.0)
 		place_building(bres, pos, rot_y, true)
+		# 同时重建 _buildings_data
+		_buildings_data.append({
+			"resource_path": res_path,
+			"position": pos,
+			"rot_y": rot_y,
+		})
 		bld_count += 1
 
 	print("[World3D] 存档加载完成 (slot %d): 建筑=%d, 动物=%d" % [_save_slot, bld_count, wd.get("animal_count", 0)])
