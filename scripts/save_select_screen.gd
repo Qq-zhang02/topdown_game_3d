@@ -23,14 +23,18 @@ const PREVIEW_ANIMS := [
 ]
 
 # 布局常量（1920x1080 参考）
-const PREVIEW_X: float = 60.0
+const PREVIEW_X: float = 880.0
 const PREVIEW_Y: float = 140.0
 const PREVIEW_SIZE: float = 240.0
-const SLOT_X: float = 340.0
+const SLOT_X: float = 300.0
 const SLOT_Y: float = 140.0
 const SLOT_W: float = 520.0
 const SLOT_H: float = 100.0
 const SLOT_GAP: float = 14.0
+const ANIM_COLS := 3
+const ANIM_BTN_W: float = 73.0
+const ANIM_BTN_H: float = 18.0
+const ANIM_GAP: float = 3.0
 
 var _root: Control
 var _slot_panels: Array[Panel] = []
@@ -226,17 +230,12 @@ func _build_ui() -> void:
 	anim_label.size = Vector2(200, 18)
 	_root.add_child(anim_label)
 
-	const ANIM_COLS := 3
-	var anim_btn_w: float = 73.0
-	var anim_btn_h: float = 18.0
-	var anim_gap: float = 3.0
-
 	for i in range(PREVIEW_ANIMS.size()):
 		var row: int = i / ANIM_COLS
 		var col: int = i % ANIM_COLS
 		var btn := Button.new()
 		btn.text = PREVIEW_ANIMS[i]
-		btn.size = Vector2(anim_btn_w, anim_btn_h)
+		btn.size = Vector2(ANIM_BTN_W, ANIM_BTN_H)
 		btn.add_theme_font_size_override("font_size", 9)
 		btn.pressed.connect(_play_preview_anim.bind(i))
 		_anim_buttons.append(btn)
@@ -522,11 +521,7 @@ func _layout_ui() -> void:
 	var path_row1_y: float = path_bottom + 10.0
 	var path_row2_y: float = path_row1_y + 22.0
 
-	# 动画预览区
-	const ANIM_COLS := 3
-	var anim_btn_w: float = 73.0
-	var anim_btn_h: float = 18.0
-	var anim_gap: float = 3.0
+	# 动画预览区（右侧预览下方）
 	var anim_start_y: float = PREVIEW_Y + PREVIEW_SIZE + 50.0
 	var anim_left_x: float = PREVIEW_X - 10.0
 
@@ -546,11 +541,11 @@ func _layout_ui() -> void:
 		elif child is Button and child.name == "QuitBtn":
 			child.position = Vector2((REF.x - child.size.x) / 2.0, path_row2_y + 50.0)
 
-	# 动画按钮
+	# 动画按钮（右侧预览下方）
 	for i in range(_anim_buttons.size()):
 		var row: int = i / ANIM_COLS
 		var col: int = i % ANIM_COLS
 		_anim_buttons[i].position = Vector2(
-			anim_left_x + col * (anim_btn_w + anim_gap),
-			anim_start_y + 22.0 + row * (anim_btn_h + anim_gap)
+			anim_left_x + col * (ANIM_BTN_W + ANIM_GAP),
+			anim_start_y + 22.0 + row * (ANIM_BTN_H + ANIM_GAP)
 		)
