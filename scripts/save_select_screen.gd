@@ -31,10 +31,11 @@ const SLOT_Y: float = 140.0
 const SLOT_W: float = 580.0
 const SLOT_H: float = 108.0
 const SLOT_GAP: float = 16.0
-const ANIM_COLS := 4
-const ANIM_BTN_W: float = 64.0
-const ANIM_BTN_H: float = 18.0
-const ANIM_GAP: float = 4.0
+const ANIM_COLS := 8
+const ANIM_BTN_W: float = 180.0
+const ANIM_BTN_H: float = 24.0
+const ANIM_GAP: float = 6.0
+const ANIM_AREA_X: float = 200.0  # 动画区域左边界
 
 var _root: Control
 var _slot_panels: Array[Panel] = []
@@ -224,10 +225,10 @@ func _build_ui() -> void:
 	# ── 动画预览按钮（左侧预览区下方）──
 	var anim_label := Label.new()
 	anim_label.name = "AnimLabel"
-	anim_label.text = "动画预览:"
-	anim_label.add_theme_font_size_override("font_size", 12)
-	anim_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.6))
-	anim_label.size = Vector2(200, 18)
+	anim_label.text = "动画预览 — 点击按钮预览角色动作"
+	anim_label.add_theme_font_size_override("font_size", 14)
+	anim_label.add_theme_color_override("font_color", Color(0.55, 0.58, 0.65))
+	anim_label.size = Vector2(600, 22)
 	_root.add_child(anim_label)
 
 	for i in range(PREVIEW_ANIMS.size()):
@@ -236,7 +237,7 @@ func _build_ui() -> void:
 		var btn := Button.new()
 		btn.text = PREVIEW_ANIMS[i]
 		btn.size = Vector2(ANIM_BTN_W, ANIM_BTN_H)
-		btn.add_theme_font_size_override("font_size", 9)
+		btn.add_theme_font_size_override("font_size", 12)
 		btn.pressed.connect(_play_preview_anim.bind(i))
 		_anim_buttons.append(btn)
 		_root.add_child(btn)
@@ -521,9 +522,8 @@ func _layout_ui() -> void:
 	var path_row1_y: float = path_bottom + 10.0
 	var path_row2_y: float = path_row1_y + 22.0
 
-	# 动画预览区（右侧预览下方）
-	var anim_start_y: float = PREVIEW_Y + PREVIEW_SIZE + 50.0
-	var anim_left_x: float = PREVIEW_X - 10.0
+	# 动画预览区（底部通栏）
+	var anim_start_y: float = path_row2_y + 44.0
 
 	for child in _root.get_children():
 		if child is Label and child.text.begins_with("选择存档"):
@@ -533,19 +533,19 @@ func _layout_ui() -> void:
 		elif child is Label and child.name == "PathLabel":
 			child.position = Vector2(SLOT_X, path_row1_y)
 		elif child is Label and child.name == "AnimLabel":
-			child.position = Vector2(anim_left_x, anim_start_y)
+			child.position = Vector2(ANIM_AREA_X, anim_start_y)
 		elif child is Button and child.name == "PathBtn":
 			child.position = Vector2(SLOT_X, path_row2_y)
 		elif child is Button and child.name == "ResetPathBtn":
 			child.position = Vector2(SLOT_X + 115, path_row2_y)
 		elif child is Button and child.name == "QuitBtn":
-			child.position = Vector2((REF.x - child.size.x) / 2.0, path_row2_y + 50.0)
+			child.position = Vector2(SLOT_X + 350, path_row2_y)
 
-	# 动画按钮（右侧预览下方）
+	# 动画按钮（底部通栏 8 列）
 	for i in range(_anim_buttons.size()):
 		var row: int = i / ANIM_COLS
 		var col: int = i % ANIM_COLS
 		_anim_buttons[i].position = Vector2(
-			anim_left_x + col * (ANIM_BTN_W + ANIM_GAP),
-			anim_start_y + 22.0 + row * (ANIM_BTN_H + ANIM_GAP)
+			ANIM_AREA_X + col * (ANIM_BTN_W + ANIM_GAP),
+			anim_start_y + 24.0 + row * (ANIM_BTN_H + ANIM_GAP)
 		)
