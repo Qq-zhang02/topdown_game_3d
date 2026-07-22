@@ -146,7 +146,7 @@ func _check_landing_attack() -> void:
 		return
 
 	# 对玩家造成伤害
-	var health := player.get_health()
+	var health: Health = player.get_health() as Health
 	if health:
 		health.take_damage(NIGHT_LANDING_DAMAGE, _body.global_position)
 

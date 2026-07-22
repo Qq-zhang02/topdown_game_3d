@@ -613,13 +613,13 @@ func _create_hp_bar() -> void:
 	label.text = "100 / 100"
 	layer.add_child(label)
 
-	var health := _player.get_health()
+	var health: Health = _player.get_health() as Health
 	health.damaged.connect(_on_hp_changed.bind(fill, label))
 	_on_hp_changed(0.0, Vector3.ZERO, fill, label)
 
 
 func _on_hp_changed(_amount: float, _from: Vector3, fill: ColorRect, label: Label) -> void:
-	var health := _player.get_health()
+	var health: Health = _player.get_health() as Health
 	var ratio := clampf(health.hp / health.max_hp, 0.0, 1.0)
 	fill.size.x = 214.0 * ratio
 
@@ -671,7 +671,7 @@ func _collect_player_data() -> Dictionary:
 		return {}
 
 	var pos := _player.global_position
-	var health_node: Node = _player.get_health()
+	var health_node: Health = _player.get_health()
 	var hp: float = health_node.get("hp") if health_node else 100.0
 
 	# 背包
@@ -767,7 +767,7 @@ func _restore_from_save(data: Dictionary) -> void:
 			pd.get("pos_x", 0.0), pd.get("pos_y", 0.0), pd.get("pos_z", 0.0)
 		)
 
-		var health_node: Node = _player.get_health()
+		var health_node: Health = _player.get_health()
 		if health_node:
 			health_node.set("hp", pd.get("health", 100.0))
 

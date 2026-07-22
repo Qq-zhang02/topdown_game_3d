@@ -21,7 +21,7 @@ var _anim_player: AnimationPlayer
 var _anim_state: AnimState = AnimState.IDLE
 var _anim_map: Dictionary = {}  # "idle"→实际动画名, "run"→..., "jump"→...
 
-var _health: Node
+var _health: Health
 var _inventory: Node
 var _dead: bool = false
 var _attacking: bool = false
@@ -297,7 +297,7 @@ func _create_survival() -> void:
 		_equipment_mgr.add_equipment(sword)
 
 
-func get_health() -> Node:
+func get_health() -> Health:
 	return _health
 
 

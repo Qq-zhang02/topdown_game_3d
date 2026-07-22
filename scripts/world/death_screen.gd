@@ -2,7 +2,7 @@ extends CanvasLayer
 class_name DeathScreen
 ## 死亡界面：玩家死亡后显示，按钮回到开始界面
 
-func setup(health: Node) -> void:
+func setup(health: Health) -> void:
 	layer = 290
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_build()

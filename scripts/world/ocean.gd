@@ -9,7 +9,7 @@ class_name Ocean
 var _mat: StandardMaterial3D
 var _world_half: float = 50.0
 var _player: Node3D
-var _health: Node
+var _health: Health
 
 
 ## 创建水面网格（在玩家创建前调用）
@@ -49,7 +49,7 @@ func _make_water_texture() -> NoiseTexture2D:
 
 
 ## 玩家创建后调用，接入伤害判定
-func setup(player: Node3D, health: Node) -> void:
+func setup(player: Node3D, health: Health) -> void:
 	_player = player
 	_health = health
 
