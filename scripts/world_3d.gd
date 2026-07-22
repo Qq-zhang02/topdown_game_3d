@@ -11,6 +11,9 @@ var _player: CharacterBody3D
 
 
 func _ready() -> void:
+	# 默认全屏启动
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+
 	# 先显示角色选择界面
 	var StartScript := load("res://scripts/start_screen.gd")
 	var start_scr := CanvasLayer.new()
@@ -20,13 +23,13 @@ func _ready() -> void:
 	add_child(start_scr)
 
 
-func _on_game_started(model_path: String) -> void:
+func _on_game_started(model_path: String, skin_path: String) -> void:
 	# 玩家选好角色后，构建世界
 	_create_lighting()
 	_create_ground()
 	_create_obstacles()
 	_create_boundary()
-	_create_player(model_path)
+	_create_player(model_path, skin_path)
 	_create_camera(_player)
 	_create_minimap(_player)
 	_create_equipment_hud(_player)
@@ -218,12 +221,13 @@ func _make_material_presets() -> Array[StandardMaterial3D]:
 # 玩家
 # ═══════════════════════════════════════════
 
-func _create_player(model_path: String) -> void:
+func _create_player(model_path: String, skin_path: String) -> void:
 	var ps := load("res://scenes/player.tscn")
 	_player = ps.instantiate() as CharacterBody3D
 	_player.name = "Player"
 	_player.position = Vector3(0, 0, 0)
 	_player.set_model_path(model_path)
+	_player.set_skin_path(skin_path)
 	add_child(_player)
 
 

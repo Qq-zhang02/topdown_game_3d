@@ -94,7 +94,6 @@ func _build_menu() -> void:
 	btn_quit.pressed.connect(_on_quit)
 	_menu_panel.add_child(btn_quit)
 
-
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause"):
 		if _paused:

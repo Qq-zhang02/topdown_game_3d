@@ -5,55 +5,16 @@ class_name StartScreen
 # ── 角色数据表 ──
 # 加新角色只需加一行：{id="xxx", name="显示名", path="模型路径"}
 const CHARACTERS := [
-	# 动物
-	{id="beaver",     name="🦫 河狸",      path="res://models/animals/animal-beaver.glb"},
-	{id="bee",        name="🐝 蜜蜂",      path="res://models/animals/animal-bee.glb"},
-	{id="bunny",      name="🐰 兔子",      path="res://models/animals/animal-bunny.glb"},
-	{id="cat",        name="🐱 猫",        path="res://models/animals/animal-cat.glb"},
-	{id="caterpillar",name="🐛 毛毛虫",    path="res://models/animals/animal-caterpillar.glb"},
-	{id="chick",      name="🐤 小鸡",      path="res://models/animals/animal-chick.glb"},
-	{id="cow",        name="🐮 牛",        path="res://models/animals/animal-cow.glb"},
-	{id="crab",       name="🦀 螃蟹",      path="res://models/animals/animal-crab.glb"},
-	{id="deer",       name="🦌 鹿",        path="res://models/animals/animal-deer.glb"},
-	{id="dog",        name="🐶 狗",        path="res://models/animals/animal-dog.glb"},
-	{id="elephant",   name="🐘 大象",      path="res://models/animals/animal-elephant.glb"},
-	{id="fish",       name="🐟 鱼",        path="res://models/animals/animal-fish.glb"},
-	{id="fox",        name="🦊 狐狸",      path="res://models/animals/animal-fox.glb"},
-	{id="giraffe",    name="🦒 长颈鹿",    path="res://models/animals/animal-giraffe.glb"},
-	{id="hog",        name="🐗 野猪",      path="res://models/animals/animal-hog.glb"},
-	{id="koala",      name="🐨 考拉",      path="res://models/animals/animal-koala.glb"},
-	{id="lion",       name="🦁 狮子",      path="res://models/animals/animal-lion.glb"},
-	{id="monkey",     name="🐵 猴子",      path="res://models/animals/animal-monkey.glb"},
-	{id="panda",      name="🐼 熊猫",      path="res://models/animals/animal-panda.glb"},
-	{id="parrot",     name="🦜 鹦鹉",      path="res://models/animals/animal-parrot.glb"},
-	{id="penguin",    name="🐧 企鹅",      path="res://models/animals/animal-penguin.glb"},
-	{id="pig",        name="🐷 猪",        path="res://models/animals/animal-pig.glb"},
-	{id="polar",      name="🐻‍❄️ 北极熊",   path="res://models/animals/animal-polar.glb"},
-	{id="tiger",      name="🐯 老虎",      path="res://models/animals/animal-tiger.glb"},
-	# 方块角色
-	{id="char_a",     name="🧑 角色 A",    path="res://models/blocky/character-a.glb"},
-	{id="char_b",     name="🧑 角色 B",    path="res://models/blocky/character-b.glb"},
-	{id="char_c",     name="🧑 角色 C",    path="res://models/blocky/character-c.glb"},
-	{id="char_d",     name="🧑 角色 D",    path="res://models/blocky/character-d.glb"},
-	{id="char_e",     name="🧑 角色 E",    path="res://models/blocky/character-e.glb"},
-	{id="char_f",     name="🧑 角色 F",    path="res://models/blocky/character-f.glb"},
-	{id="char_g",     name="🧑 角色 G",    path="res://models/blocky/character-g.glb"},
-	{id="char_h",     name="🧑 角色 H",    path="res://models/blocky/character-h.glb"},
-	{id="char_i",     name="🧑 角色 I",    path="res://models/blocky/character-i.glb"},
-	{id="char_j",     name="🧑 角色 J",    path="res://models/blocky/character-j.glb"},
-	{id="char_k",     name="🧑 角色 K",    path="res://models/blocky/character-k.glb"},
-	{id="char_l",     name="🧑 角色 L",    path="res://models/blocky/character-l.glb"},
-	{id="char_m",     name="🧑 角色 M",    path="res://models/blocky/character-m.glb"},
-	{id="char_n",     name="🧑 角色 N",    path="res://models/blocky/character-n.glb"},
-	{id="char_o",     name="🧑 角色 O",    path="res://models/blocky/character-o.glb"},
-	{id="char_p",     name="🧑 角色 P",    path="res://models/blocky/character-p.glb"},
-	{id="char_q",     name="🧑 角色 Q",    path="res://models/blocky/character-q.glb"},
-	{id="char_r",     name="🧑 角色 R",    path="res://models/blocky/character-r.glb"},
+	{id="survivor_male",   name="🧔 男幸存者", path="res://models/survivor/characterMedium.fbx", skin="res://models/survivor/survivorMaleB.png"},
+	{id="survivor_female", name="👩 女幸存者", path="res://models/survivor/characterMedium.fbx", skin="res://models/survivor/survivorFemaleA.png"},
+	{id="zombie_a",        name="🧟 僵尸 A",   path="res://models/survivor/characterMedium.fbx", skin="res://models/survivor/zombieA.png"},
+	{id="zombie_c",        name="🧟 僵尸 C",   path="res://models/survivor/characterMedium.fbx", skin="res://models/survivor/zombieC.png"},
 ]
 
-signal started(selected_model_path: String)
+signal started(selected_model_path: String, selected_skin_path: String)
 
-var _selected_path: String = CHARACTERS[12].path  # 默认狐狸
+var _selected_path: String = CHARACTERS[0].path
+var _selected_skin: String = CHARACTERS[0].skin
 var _selected_btn: Button
 var _highlight_style: StyleBoxFlat
 var _sel_label: Label
@@ -180,14 +141,14 @@ func _build_ui() -> void:
 		_grid_buttons.append(btn)
 		_root.add_child(btn)
 
-		if CHARACTERS[i].id == "fox":
+		if CHARACTERS[i].id == "survivor_male":
 			_selected_btn = btn
 			btn.add_theme_stylebox_override("normal", _highlight_style)
 
 	# ── 当前选择 ──
 	_sel_label = Label.new()
 	_sel_label.name = "SelectedLabel"
-	_sel_label.text = "已选：Fox"
+	_sel_label.text = "已选：" + CHARACTERS[0].name
 	_sel_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_sel_label.add_theme_font_size_override("font_size", 15)
 	_sel_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.9))
@@ -212,6 +173,7 @@ func _on_model_clicked(idx: int, btn: Button) -> void:
 	btn.add_theme_stylebox_override("normal", _highlight_style)
 
 	_selected_path = CHARACTERS[idx].path
+	_selected_skin = CHARACTERS[idx].skin
 	_sel_label.text = "已选：" + CHARACTERS[idx].name
 	_update_preview()
 
@@ -234,6 +196,9 @@ func _update_preview() -> void:
 	# 先入树再算全局包围盒（骨骼层级变换才能正确计算）
 	_preview_viewport.add_child(_preview_model)
 
+	# 给模型贴当前选中的皮肤
+	_apply_preview_skin()
+
 	var aabb := _get_global_aabb(_preview_model)
 	if aabb.size.length_squared() > 0.01:
 		var max_dim := maxf(aabb.size.x, maxf(aabb.size.y, aabb.size.z))
@@ -245,7 +210,6 @@ func _update_preview() -> void:
 
 
 func _get_global_aabb(node: Node3D) -> AABB:
-	# 用 global_transform 正确计算骨骼层级下的实际包围盒
 	var aabb: AABB = AABB()
 	for child in node.find_children("*", "MeshInstance3D", true, false):
 		var m: MeshInstance3D = child
@@ -259,8 +223,28 @@ func _get_global_aabb(node: Node3D) -> AABB:
 	return aabb
 
 
+## 预览窗口也给幸存者贴皮肤
+func _apply_preview_skin() -> void:
+	if _selected_skin.is_empty():
+		return
+	var tex: Texture2D = load(_selected_skin)
+	if not tex:
+		return
+	for mesh: MeshInstance3D in _preview_model.find_children("*", "MeshInstance3D", true, false):
+		var m: Mesh = mesh.mesh
+		if not m:
+			continue
+		for i in m.get_surface_count():
+			var mat := mesh.get_active_material(i)
+			if not mat:
+				continue
+			mat = mat.duplicate()
+			mat.albedo_texture = tex
+			mesh.set_surface_override_material(i, mat)
+
+
 func _on_start() -> void:
-	started.emit(_selected_path)
+	started.emit(_selected_path, _selected_skin)
 	queue_free()
 
 

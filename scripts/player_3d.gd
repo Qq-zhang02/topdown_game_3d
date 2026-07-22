@@ -4,7 +4,11 @@ class_name Player3D
 
 const EquipmentClass := preload("res://scripts/equipment.gd")
 
-var _model_path: String = "res://models/animals/animal-fox.glb"
+# 动画状态
+enum AnimState { IDLE, RUN, JUMP }
+
+var _model_path: String = "res://models/survivor/characterMedium.fbx"
+var _skin_path: String = "res://models/survivor/survivorMaleB.png"
 
 @export var speed: float = 9.0
 @export var jump_velocity: float = 15.0
@@ -13,16 +17,23 @@ var _model_path: String = "res://models/animals/animal-fox.glb"
 
 var _equipment_mgr: Node
 var _model_root: Node3D
+var _anim_player: AnimationPlayer
+var _anim_state: AnimState = AnimState.IDLE
 
 
 func set_model_path(path: String) -> void:
 	_model_path = path
 
 
+func set_skin_path(path: String) -> void:
+	_skin_path = path
+
+
 func _ready() -> void:
 	_create_model()
 	_create_collision()
 	_create_lights_and_equipment()
+	_setup_animations()
 
 
 # ═══════════════════════════════════════════
@@ -42,6 +53,7 @@ func _create_model() -> void:
 	add_child(_model_root)
 
 	_set_shadow_recursive(_model_root)
+	_apply_skin(_model_path)
 
 	var aabb := _get_model_aabb(_model_root)
 	if aabb.size.y > 0.01:
@@ -75,6 +87,26 @@ func _set_shadow_recursive(node: Node) -> void:
 		_set_shadow_recursive(child)
 
 
+## 为 FBX 模型（无内嵌贴图）应用皮肤纹理
+func _apply_skin(model_path: String) -> void:
+	if _skin_path.is_empty() or not ResourceLoader.exists(_skin_path):
+		return
+	var tex: Texture2D = load(_skin_path)
+	if not tex:
+		return
+	for mesh: MeshInstance3D in _model_root.find_children("*", "MeshInstance3D", true, false):
+		var m: Mesh = mesh.mesh
+		if not m:
+			continue
+		for i in m.get_surface_count():
+			var mat := mesh.get_active_material(i)
+			if not mat:
+				continue
+			mat = mat.duplicate()
+			mat.albedo_texture = tex
+			mesh.set_surface_override_material(i, mat)
+
+
 func _create_collision() -> void:
 	if not _model_root:
 		var col := CollisionShape3D.new()
@@ -104,6 +136,122 @@ func _create_collision() -> void:
 	# to_local 确保在世界坐标->本地坐标正确转换
 	col.position = to_local(aabb.position + aabb.size * 0.5)
 	add_child(col)
+
+
+# ═══════════════════════════════════════════
+# 动画系统
+# ═══════════════════════════════════════════
+
+func _setup_animations() -> void:
+	if not _model_root:
+		print("[Player3D] _setup_animations: _model_root 为空，跳过")
+		return
+
+	print("[Player3D] _setup_animations: 开始加载动画...")
+	# 尝试从导入的 FBX 场景中找 AnimationPlayer
+	_anim_player = _model_root.get_node_or_null("AnimationPlayer") as AnimationPlayer
+	if not _anim_player:
+		_anim_player = AnimationPlayer.new()
+		_anim_player.name = "AnimationPlayer"
+		_model_root.add_child(_anim_player)
+		print("[Player3D] _setup_animations: 创建新的 AnimationPlayer")
+	else:
+		print("[Player3D] _setup_animations: 使用 FBX 自带的 AnimationPlayer")
+
+	# 加载动画（从 FBX 场景中提取 AnimationPlayer 的动画数据）
+	_try_load_anim("idle", "res://models/survivor/animations/idle.fbx")
+	_try_load_anim("run", "res://models/survivor/animations/run.fbx")
+	_try_load_anim("jump", "res://models/survivor/animations/jump.fbx")
+
+	# 有动画就播 idle
+	if _anim_player.has_animation("idle"):
+		_anim_player.play("idle")
+
+
+func _try_load_anim(anim_name: String, path: String) -> void:
+	if not ResourceLoader.exists(path):
+		push_warning("[Player3D] 动画文件不存在: " + path)
+		return
+
+	var anim_scene: PackedScene = load(path)
+	if not anim_scene:
+		push_warning("[Player3D] 动画场景加载失败: " + path)
+		return
+
+	# 实例化动画场景（不入树），提取 AnimationPlayer
+	var anim_node: Node = anim_scene.instantiate()
+	print("[Player3D] 动画场景子节点: ", anim_node.get_children().map(func(c): return c.name))
+	var src_ap: AnimationPlayer
+	for child in anim_node.find_children("*", "AnimationPlayer", true, false):
+		src_ap = child
+		break
+
+	if not src_ap:
+		push_warning("[Player3D] 动画场景中无 AnimationPlayer: " + path)
+		anim_node.queue_free()
+		return
+
+	# 获取主模型骨骼路径（用于重映射）
+	var main_skel_path: String = ""
+	for child in _model_root.find_children("*", "Skeleton3D", true, false):
+		main_skel_path = str(_model_root.get_path_to(child))
+		break
+
+	var anim_skel_path: String = ""
+	for child in anim_node.find_children("*", "Skeleton3D", true, false):
+		anim_skel_path = str(anim_node.get_path_to(child))
+		break
+
+	var lib := AnimationLibrary.new()
+	for a in src_ap.get_animation_list():
+		var anim: Animation = src_ap.get_animation(a)
+		# 如果骨骼路径不一致，重映射 track 路径
+		if main_skel_path != "" and anim_skel_path != "" and anim_skel_path != main_skel_path:
+			anim = _remap_animation_tracks(anim.duplicate(), anim_skel_path, main_skel_path)
+		lib.add_animation(anim_name, anim)
+
+	_anim_player.add_animation_library(anim_name, lib)
+	anim_node.queue_free()
+	print("[Player3D] 动画加载成功: %s (%d tracks)" % [anim_name, src_ap.get_animation_list().size()])
+
+
+## 重映射动画 track 中的骨骼路径（动画场景 → 主模型）
+func _remap_animation_tracks(anim: Animation, from_prefix: String, to_prefix: String) -> Animation:
+	for i in range(anim.get_track_count()):
+		var tp: NodePath = anim.track_get_path(i)
+		var tp_str: String = str(tp)
+		if tp_str.begins_with(from_prefix):
+			var new_path: String = to_prefix + tp_str.substr(from_prefix.length())
+			anim.track_set_path(i, new_path)
+	return anim
+
+
+func _update_animation(input_length: float) -> void:
+	if not _anim_player:
+		return
+
+	var new_state: AnimState
+	if not is_on_floor():
+		new_state = AnimState.JUMP
+	elif input_length > 0.1:
+		new_state = AnimState.RUN
+	else:
+		new_state = AnimState.IDLE
+
+	if new_state == _anim_state:
+		return
+	_anim_state = new_state
+
+	match new_state:
+		AnimState.IDLE:
+			if _anim_player.has_animation("idle"):
+				_anim_player.play("idle")
+		AnimState.RUN:
+			if _anim_player.has_animation("run"):
+				_anim_player.play("run")
+		AnimState.JUMP:
+			if _anim_player.has_animation("jump"):
+				_anim_player.play("jump")
 
 
 # ═══════════════════════════════════════════
@@ -212,6 +360,7 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 	_face_mouse()
+	_update_animation(input_dir.length())
 
 
 func _face_mouse() -> void:
