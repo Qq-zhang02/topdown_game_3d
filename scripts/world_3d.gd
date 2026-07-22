@@ -17,6 +17,9 @@ var _save_slot: int = -1                    # 当前存档槽位
 var _game_started: bool = false             # 游戏是否已开始（用于自动存档）
 var _auto_save_timer: float = 0.0            # 自动存档计时器
 var _save_toast: Label                        # 自动存档提示标签
+var _hp_fill: ColorRect                       # 血条填充引用
+var _hp_label: Label                          # 血条文本引用
+var _loading_save: bool = false               # 是否正在加载存档（跳过初始保存）
 
 
 func _ready() -> void:
@@ -50,6 +53,7 @@ func _on_new_game(slot: int) -> void:
 func _on_load_game(save_data: Dictionary, slot: int) -> void:
 	_save_slot = slot
 	_play_time = save_data.get("play_time", 0.0)
+	_loading_save = true
 	_remove_save_select()
 
 	var model_path: String = save_data.get("character_model", "res://models/character/character-archer.glb")
@@ -91,8 +95,10 @@ func _on_game_started(model_path: String, skin_path: String, save_slot: int) -> 
 	_game_started = true
 	# 创建自动存档提示
 	_create_save_toast()
-	# 延迟保存初始状态（等所有节点的 _ready 执行完）
-	_save_current_game.call_deferred()
+	# 加载存档时跳过初始保存（_restore_from_save 最后会保存）
+	if not _loading_save:
+		_save_current_game.call_deferred()
+	_loading_save = false
 
 
 # ═══════════════════════════════════════════
@@ -596,39 +602,47 @@ func _create_hp_bar() -> void:
 	bg.add_theme_stylebox_override("panel", ts)
 	layer.add_child(bg)
 
-	var fill := ColorRect.new()
-	fill.name = "HPFill"
-	fill.position = Vector2(18, 283)
-	fill.size = Vector2(214, 20)
-	fill.color = Color(0.2, 0.85, 0.2)
-	layer.add_child(fill)
+	_hp_fill = ColorRect.new()
+	_hp_fill.name = "HPFill"
+	_hp_fill.position = Vector2(18, 283)
+	_hp_fill.size = Vector2(214, 20)
+	_hp_fill.color = Color(0.2, 0.85, 0.2)
+	layer.add_child(_hp_fill)
 
-	var label := Label.new()
-	label.name = "HPLabel"
-	label.position = Vector2(18, 283)
-	label.size = Vector2(214, 20)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 13)
-	label.add_theme_color_override("font_color", Color.WHITE)
-	label.text = "100 / 100"
-	layer.add_child(label)
+	_hp_label = Label.new()
+	_hp_label.name = "HPLabel"
+	_hp_label.position = Vector2(18, 283)
+	_hp_label.size = Vector2(214, 20)
+	_hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hp_label.add_theme_font_size_override("font_size", 13)
+	_hp_label.add_theme_color_override("font_color", Color.WHITE)
+	_hp_label.text = "100 / 100"
+	layer.add_child(_hp_label)
 
 	var health: Health = _player.get_health() as Health
-	health.damaged.connect(_on_hp_changed.bind(fill, label))
-	_on_hp_changed(0.0, Vector3.ZERO, fill, label)
+	health.damaged.connect(_on_hp_changed)
+	_update_hp_bar()
 
 
-func _on_hp_changed(_amount: float, _from: Vector3, fill: ColorRect, label: Label) -> void:
+func _on_hp_changed(_amount: float, _from: Vector3) -> void:
+	_update_hp_bar()
+
+
+func _update_hp_bar() -> void:
+	if not _player or not _hp_fill or not _hp_label:
+		return
 	var health: Health = _player.get_health() as Health
+	if not health:
+		return
 	var ratio := clampf(health.hp / health.max_hp, 0.0, 1.0)
-	fill.size.x = 214.0 * ratio
+	_hp_fill.size.x = 214.0 * ratio
 
 	if ratio > 0.5:
-		fill.color = Color(0.2, 0.85, 0.2).lerp(Color(0.85, 0.85, 0.1), (1.0 - ratio) * 2.0)
+		_hp_fill.color = Color(0.2, 0.85, 0.2).lerp(Color(0.85, 0.85, 0.1), (1.0 - ratio) * 2.0)
 	else:
-		fill.color = Color(0.85, 0.85, 0.1).lerp(Color(0.85, 0.15, 0.1), (0.5 - ratio) * 2.0)
+		_hp_fill.color = Color(0.85, 0.85, 0.1).lerp(Color(0.85, 0.15, 0.1), (0.5 - ratio) * 2.0)
 
-	label.text = "%d / %d" % [int(ceil(health.hp)), int(health.max_hp)]
+	_hp_label.text = "%d / %d" % [int(ceil(health.hp)), int(health.max_hp)]
 
 
 # ═══════════════════════════════════════════
@@ -757,19 +771,26 @@ func _show_save_toast() -> void:
 # ═══════════════════════════════════════════
 
 func _restore_from_save(data: Dictionary) -> void:
+	print("[World3D] 开始加载存档 (slot %d)..." % _save_slot)
 	if not _player:
+		print("[World3D] 错误: _player 不存在")
 		return
 
 	# ── 玩家状态 ──
 	var pd: Dictionary = data.get("player", {})
 	if not pd.is_empty():
-		_player.global_position = Vector3(
+		var saved_pos := Vector3(
 			pd.get("pos_x", 0.0), pd.get("pos_y", 0.0), pd.get("pos_z", 0.0)
 		)
+		_player.global_position = saved_pos
+		print("[World3D] 位置恢复: ", saved_pos)
 
-		var health_node: Health = _player.get_health()
+		var health_node: Health = _player.get_health() as Health
 		if health_node:
-			health_node.set("hp", pd.get("health", 100.0))
+			var saved_hp: float = pd.get("health", 100.0)
+			health_node.set("hp", saved_hp)
+			print("[World3D] 血量恢复: ", saved_hp)
+			_update_hp_bar()
 
 		# 背包
 		var inv: Node = _player.get_inventory()
@@ -778,19 +799,22 @@ func _restore_from_save(data: Dictionary) -> void:
 			inv.slots.resize(inv.slot_count)
 			var ItemDBScript := load("res://scripts/core/item_db.gd")
 			var ItemStackClass := load("res://scripts/core/item_stack.gd")
-			for i in range(pd.get("inventory", []).size()):
-				var entry = pd["inventory"][i]
+			var inv_arr: Array = pd.get("inventory", [])
+			for i in range(inv_arr.size()):
+				var entry = inv_arr[i]
 				if entry and entry.get("id"):
 					var item: Resource = ItemDBScript.get_item(entry["id"])
 					if item:
 						inv.slots[i] = ItemStackClass.new(item, int(entry.get("count", 1)))
 			inv.changed.emit()
+			print("[World3D] 背包恢复: %d 项" % inv_arr.size())
 
 		# 装备
 		var equip_mgr: Node = _player.get_node_or_null("EquipmentManager")
 		if equip_mgr:
 			var idx: int = pd.get("equipment_index", 0)
 			equip_mgr.equip_index(idx)
+			print("[World3D] 装备恢复: index=%d" % idx)
 
 	# ── 世界状态 ──
 	var wd: Dictionary = data.get("world", {})
@@ -798,11 +822,14 @@ func _restore_from_save(data: Dictionary) -> void:
 	# 昼夜时间
 	if _day_night and wd.has("day_time"):
 		_day_night.set("game_time", float(wd["day_time"]))
+		print("[World3D] 昼夜恢复: ", wd["day_time"])
 
 	# 建筑
+	var bld_count := 0
 	for bd in wd.get("buildings", []):
 		var res_path: String = bd.get("resource_path", "")
 		if res_path.is_empty() or not ResourceLoader.exists(res_path):
+			print("[World3D] 跳过建筑: 资源不存在 ", res_path)
 			continue
 		var bres: Resource = load(res_path)
 		if not bres:
@@ -812,7 +839,8 @@ func _restore_from_save(data: Dictionary) -> void:
 		)
 		var rot_y: float = bd.get("rot_y", 0.0)
 		place_building(bres, pos, rot_y, true)
+		bld_count += 1
 
-	print("[World3D] 存档加载完成 (slot %d)" % _save_slot)
+	print("[World3D] 存档加载完成 (slot %d): 建筑=%d" % [_save_slot, bld_count])
 	# 恢复完成后立即保存一次（覆盖 _on_game_started 中的初始保存）
 	_save_current_game.call_deferred()
