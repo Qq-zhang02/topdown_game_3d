@@ -389,7 +389,7 @@ func _spawn_single_animal() -> void:
 		return
 
 	var model_idx := rng.randi_range(0, ANIMALS.size() - 1)
-	var model_path := MODEL_DIR + ANIMALS[model_idx]
+	var model_path: String = MODEL_DIR + ANIMALS[model_idx]
 	if not ResourceLoader.exists(model_path):
 		return
 
