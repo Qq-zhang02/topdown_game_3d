@@ -10,6 +10,8 @@
 F:/godot_stuff/projects/topdown_game_3d-v3/
 ```
 
+GitHub (公开)：`https://github.com/Qq-zhang02/topdown_game_3d`
+
 ---
 
 ## 2. 目录结构
