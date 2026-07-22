@@ -859,8 +859,10 @@ func _knockback_player(from: Vector3) -> void:
 		return
 	var dir := (_player.global_position - from)
 	dir.y = 0.0
+	if dir.length_squared() < 0.01:
+		dir = Vector3.RIGHT
 	dir = dir.normalized()
-	dir.y = 0.15  # 微微向上
+	# 击退只做水平，不干扰跳跃判定
 	_player.apply_knockback(dir, 8.0)
 
 
