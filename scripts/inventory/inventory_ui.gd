@@ -53,7 +53,7 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
 		var idx := _get_hovered_slot_index()
 		if idx >= 0:
-			var st := _inventory.get_stack(idx)
+			var st: ItemStack = _inventory.get_stack(idx) as ItemStack
 			if st and st.item.get("heal_amount") > 0.0:
 				_consume_slot(idx, st)
 				get_viewport().set_input_as_handled()
@@ -147,7 +147,7 @@ func _refresh() -> void:
 	if not _inventory:
 		return
 	for i in range(_slots.size()):
-		var st = _inventory.get_stack(i)
+		var st: ItemStack = _inventory.get_stack(i) as ItemStack
 		var name_label := _name_labels[i]
 		var count_label := _count_labels[i]
 		var bg := _bg_styles[i]
