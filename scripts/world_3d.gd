@@ -22,6 +22,7 @@ var _hp_label: Label                          # 血条文本引用
 var _loading_save: bool = false               # 是否正在加载存档（跳过初始保存）
 var _resource_positions: Array[Dictionary] = []  # 资源节点位置存档 [{kind, pos_x, pos_z}]
 var _regen_timer: float = 0.0                    # 资源重生计时器
+var _animal_regen_timer: float = 0.0              # 动物重生计时器
 
 
 func _ready() -> void:
@@ -334,6 +335,125 @@ func _try_regen_resource() -> void:
 			_obstacle_data.append({"position": pos, "size": Vector3(1.5, 2.0, 1.5)})
 			_resource_positions.append({"kind": kind, "pos_x": pos.x, "pos_z": pos.z})
 			return
+
+
+## 白天动物缓慢重生
+func _try_regen_animal() -> void:
+	if not _day_night:
+		return
+	var hours: float = _day_night.get_time_hours()
+	if hours < 6.0 or hours >= 19.0:
+		return
+
+	# 统计存活动物
+	var count := 0
+	for body in get_tree().get_nodes_in_group("damageable"):
+		if body is RigidBody3D:
+			count += 1
+	if count >= 30:
+		return
+
+	_spawn_single_animal()
+
+
+func _spawn_single_animal() -> void:
+	const MODEL_DIR := "res://models/animals/"
+	const ANIMALS := [
+		"animal-beaver.glb", "animal-bee.glb", "animal-bunny.glb",
+		"animal-cat.glb", "animal-caterpillar.glb", "animal-chick.glb",
+		"animal-cow.glb", "animal-crab.glb", "animal-deer.glb",
+		"animal-dog.glb", "animal-elephant.glb", "animal-fish.glb",
+		"animal-fox.glb", "animal-giraffe.glb", "animal-hog.glb",
+		"animal-koala.glb", "animal-lion.glb", "animal-monkey.glb",
+		"animal-panda.glb", "animal-parrot.glb", "animal-penguin.glb",
+		"animal-pig.glb", "animal-polar.glb", "animal-tiger.glb",
+	]
+
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+
+	var pos: Vector3
+	var found := false
+	for attempt in range(30):
+		pos = Vector3(
+			rng.randf_range(-WORLD_HALF + 4.0, WORLD_HALF - 4.0),
+			0,
+			rng.randf_range(-WORLD_HALF + 4.0, WORLD_HALF - 4.0)
+		)
+		if _player and pos.distance_to(_player.global_position) < 10.0:
+			continue
+		if is_area_free(pos, Vector2(1.0, 1.0)):
+			found = true
+			break
+	if not found:
+		return
+
+	var model_idx := rng.randi_range(0, ANIMALS.size() - 1)
+	var model_path := MODEL_DIR + ANIMALS[model_idx]
+	if not ResourceLoader.exists(model_path):
+		return
+
+	var scene: PackedScene = load(model_path)
+	if not scene:
+		return
+
+	var s: float = rng.randf_range(0.4, 0.5)
+	var ry: float = rng.randf_range(0.0, TAU)
+
+	var body := RigidBody3D.new()
+	body.name = ANIMALS[model_idx].trim_suffix(".glb")
+	body.position = pos
+	body.mass = 1.0
+	body.gravity_scale = 1.0
+	body.collision_layer = 2
+	body.collision_mask = 1
+	body.linear_damp = 0.6
+	body.angular_damp = 0.9
+	body.continuous_cd = true
+	add_child(body)
+
+	var model_root: Node3D = scene.instantiate()
+	model_root.name = "Model"
+	model_root.scale = Vector3(s, s, s)
+	model_root.rotation.y = ry
+	body.add_child(model_root)
+
+	var col := CollisionShape3D.new()
+	var shape := CapsuleShape3D.new()
+	shape.radius = 0.25 * s
+	shape.height = 0.6 * s
+	col.shape = shape
+	col.position = Vector3(0, shape.height * 0.5, 0)
+	body.add_child(col)
+
+	for mesh: MeshInstance3D in model_root.find_children("*", "MeshInstance3D", true, false):
+		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+	var BehaviorScript := load("res://scripts/animal_behavior.gd")
+	var behavior := Node.new()
+	behavior.set_script(BehaviorScript)
+	behavior.name = "Behavior"
+	behavior.set("hop_impulse", randf_range(1.5, 3.0))
+	behavior.set("hop_up", randf_range(2.5, 5.0))
+	behavior.set("world_boundary", WORLD_HALF - 1.0)
+	body.add_child(behavior)
+
+	body.add_to_group("damageable")
+	var HealthScript := load("res://scripts/combat/health.gd")
+	var health := Node.new()
+	health.set_script(HealthScript)
+	health.name = "Health"
+	health.set("max_hp", 30.0)
+	body.add_child(health)
+
+	var ItemDBScript := load("res://scripts/core/item_db.gd")
+	var PickupScript := load("res://scripts/combat/pickup.gd")
+	health.died.connect(func():
+		var meat: Resource = ItemDBScript.get_item("meat")
+		if meat:
+			PickupScript.spawn(self, meat, randi_range(1, 2), body.global_position)
+		body.queue_free()
+	)
 
 
 # ═══════════════════════════════════════════
@@ -714,6 +834,10 @@ func _process(delta: float) -> void:
 		if _regen_timer >= 30.0:
 			_regen_timer = 0.0
 			_try_regen_resource()
+		_animal_regen_timer += delta
+		if _animal_regen_timer >= 45.0:
+			_animal_regen_timer = 0.0
+			_try_regen_animal()
 		if _auto_save_timer >= 60.0:
 			_auto_save_timer = 0.0
 			_save_current_game()
@@ -785,10 +909,16 @@ func _collect_world_data() -> Dictionary:
 			"rot_y": b.rot_y,
 		})
 
+	var animal_count := 0
+	for body in get_tree().get_nodes_in_group("damageable"):
+		if body is RigidBody3D:
+			animal_count += 1
+
 	return {
 		"day_time": day_time,
 		"buildings": buildings,
 		"resources": _resource_positions,
+		"animal_count": animal_count,
 	}
 
 
@@ -910,6 +1040,6 @@ func _restore_from_save(data: Dictionary) -> void:
 		place_building(bres, pos, rot_y, true)
 		bld_count += 1
 
-	print("[World3D] 存档加载完成 (slot %d): 建筑=%d" % [_save_slot, bld_count])
+	print("[World3D] 存档加载完成 (slot %d): 建筑=%d, 动物=%d" % [_save_slot, bld_count, wd.get("animal_count", 0)])
 	# 恢复完成后立即保存一次（覆盖 _on_game_started 中的初始保存）
 	_save_current_game.call_deferred()
