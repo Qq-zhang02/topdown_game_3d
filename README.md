@@ -1,4 +1,4 @@
-# TopDownGame3D v3
+# TopDownGame3D v3.2
 
 > Godot 4.7.1 · 俯视角 3D · 全 GDScript · 2026-07-22
 
@@ -59,6 +59,8 @@ topdown_game_3d-v3/
 │   ├── camera_follow_3d.gd / minimap_3d.gd / day_night_cycle.gd
 │   ├── animal_spawner.gd      # 动物生成（+血量/掉落生肉）
 │   ├── animal_behavior.gd     # 动物行为
+│   ├── save_manager.gd           # ★ 存档管理器：5槽位，JSON读写 user://saves/
+│   ├── save_select_screen.gd     # ★ 存档选择界面：新建/进入/删除
 │   ├── start_screen.gd / menu_manager.gd / keybind_menu.gd / time_display.gd
 └── models/                    # 角色 + 24种动物 GLB
 ```
@@ -68,16 +70,21 @@ topdown_game_3d-v3/
 ## 3. 启动流程
 
 ```
-world_3d._ready() → StartScreen → started → _on_game_started()
-  ├── 光照 / 地面 / 障碍物（登记占地）
-  ├── _create_ocean()           → 海洋（边界，落水掉血）
-  ├── _create_player()          → 玩家（含血量/背包/近战/初始物资：木剑+木材12+石头8）
-  ├── _create_resource_nodes()  → 25树 + 15石头（可采集）
-  ├── 动物 / 摄像机 / 小地图 / 装备栏
-  ├── _create_inventory_ui()    → 背包（Tab）
-  ├── _create_build_system()    → 建造（B）
-  ├── _create_death_screen()    → 死亡界面
-  └── 菜单 / 昼夜 / 时间显示
+world_3d._ready()
+  → SaveSelectScreen（存档选择：5槽位）
+      ├─ 空槽位「新建」→ StartScreen（角色选择）→ 新游戏 → 自动存档
+      └─ 已有存档「进入」→ 加载世界状态 → 直接进入游戏
+  → _on_game_started()
+      ├── 光照 / 地面 / 障碍物（登记占地）
+      ├── _create_ocean()           → 海洋（边界，落水掉血）
+      ├── _create_player()          → 玩家（含血量/背包/近战/初始物资：木剑+木材12+石头8）
+      ├── _create_resource_nodes()  → 25树 + 15石头（可采集）
+      ├── 动物 / 摄像机 / 小地图 / 装备栏
+      ├── _create_inventory_ui()    → 背包（Tab）
+      ├── _create_build_system()    → 建造（B）
+      ├── _create_death_screen()    → 死亡界面
+      ├── 菜单 / 昼夜 / 时间显示
+      └── 初始存档 + 启动自动存档定时器
 ```
 
 ---
@@ -93,7 +100,7 @@ world_3d._ready() → StartScreen → started → _on_game_started()
 | **B** | 建造菜单 → 选配方 → 幽灵预览 → 左键放置 |
 | **R** | 建造时旋转 90° |
 | 右键(按住) | 瞄准；建造中点右键取消 |
-| Esc | 暂停菜单 |
+| Esc | 暂停菜单（继续/保存/重新开始/返回/按键/退出） |
 
 ---
 
@@ -118,11 +125,55 @@ world_3d._ready() → StartScreen → started → _on_game_started()
 
 砍树/砸石头（近战）→ 掉木材/石头 → 自动拾取进背包 → B 打开建造 →
 消耗材料放篝火(发光)/木墙(阻挡)/木地基(平台)。
-杀动物 → 掉生肉。走进海里 → 持续掉血 → 死亡 → 回开始界面。
+杀动物 → 掉生肉。走进海里 → 持续掉血 → 死亡 → 回存档选择界面。
 
 ---
 
-## 7. 碰撞层
+## 7. 存档系统 ★ v3.2 新增
+
+### 存档内容
+
+存档为 JSON 文件，位于 `user://saves/slot_0.json` ~ `slot_4.json`：
+
+| 类别 | 存储内容 |
+|------|---------|
+| 玩家 | 位置 (x,y,z)、血量、背包全部格子、当前装备索引、角色模型/皮肤 |
+| 世界 | 昼夜时间 (game_time)、已放置建筑（资源路径+位置+旋转） |
+| 元数据 | 版本号、时间戳、累计游玩时长 |
+
+### 存档触发
+
+| 方式 | 触发 | 反馈 |
+|------|------|------|
+| 手动 | Esc → 暂停菜单 →「保存游戏」 | 菜单内 "游戏已保存 ✓"（2秒） |
+| 自动 | 每 60 秒 | 屏幕中央 "游戏已保存"（淡出） |
+| 退出 | 关闭游戏窗口 | 静默保存 |
+| 初始 | 新游戏开始后 | 立即创建存档 |
+
+### 存档操作
+
+- **最多 5 个存档位**，超出需删除旧存档
+- 空槽位「新建」→ 角色选择 → 新游戏
+- 已有存档「进入」→ 直接加载世界状态
+- 删除需要确认对话框
+
+### 数据流
+
+```
+SaveManager (RefCounted 静态工具类)
+  ├── list_saves()      → 获取 5 个槽位信息（轻量，不加载完整数据）
+  ├── load_save(slot)   → 读取完整 JSON
+  ├── save_game(slot, data) → 写入 JSON
+  ├── delete_save(slot) → 删除文件
+  └── has_save(slot)    → 检查是否存在
+
+world_3d._collect_save_data()  → 收集玩家+世界状态
+world_3d._restore_from_save()  → 恢复位置/血量/背包/建筑/昼夜
+```
+
+---
+
+## 8. 碰撞层
 
 | 层 | 对象 |
 |----|------|
@@ -133,7 +184,7 @@ world_3d._ready() → StartScreen → started → _on_game_started()
 
 ---
 
-## 8. 注意事项
+## 9. 注意事项
 
 - **导出的 .remap 后缀**：导出包里 DirAccess 列出的文件是 `xxx.tres.remap`，扫描目录时必须 `trim_suffix(".remap")` 再判断和加载（ItemDB / BuildController 已处理）
 - **Object.get 冲突**：自定义静态方法不能叫 `get`（与原生冲突），ItemDB 用 `get_item`
@@ -141,3 +192,5 @@ world_3d._ready() → StartScreen → started → _on_game_started()
 - **UI 缩放**：1920x1080 参考，scale 0.6~1.6
 - **GLB 动画**：attack-melee-* 用于挥击，die 用于死亡，均设 LOOP_NONE
 - **幽灵合法性**：占地(占用AABB) + 世界边界 + 材料是否足够，三者同时决定绿/红
+- **存档位置**：`user://saves/`（Windows: `%APPDATA%/Godot/app_userdata/TopDownGame3D/saves/`），JSON 格式可直接查看/编辑
+- **SaveManager 为静态 RefCounted**：无需实例化，直接 `SaveManager.save_game(slot, data)` 调用

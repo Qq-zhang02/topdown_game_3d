@@ -8,11 +8,12 @@ const CHARACTERS := [
 	{id="archer", name="弓箭手", path="res://models/character/character-archer.glb", skin="res://models/character/colormap.png"},
 ]
 
-signal started(selected_model_path: String, selected_skin_path: String)
+signal started(selected_model_path: String, selected_skin_path: String, save_slot: int)
 
 var _selected_path: String = CHARACTERS[0].path
 var _selected_skin: String = CHARACTERS[0].skin
 var _selected_btn: Button
+var _save_slot: int = -1
 var _highlight_style: StyleBoxFlat
 var _sel_label: Label
 var _preview_viewport: SubViewport
@@ -46,6 +47,10 @@ const PREVIEW_ANIMS := [
 var _anim_buttons: Array[Button] = []
 var _anim_label: Label
 var _playing_anim: bool = false
+
+
+func setup(slot: int) -> void:
+	_save_slot = slot
 
 
 func _ready() -> void:
@@ -284,7 +289,7 @@ func _apply_preview_skin() -> void:
 
 
 func _on_start() -> void:
-	started.emit(_selected_path, _selected_skin)
+	started.emit(_selected_path, _selected_skin, _save_slot)
 	queue_free()
 
 

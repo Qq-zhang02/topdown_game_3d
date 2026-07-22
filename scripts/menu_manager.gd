@@ -1,11 +1,14 @@
 extends CanvasLayer
 class_name MenuManager
-## 暂停菜单：继续、重新开始、返回主页面
+## 暂停菜单：继续、保存、重新开始、返回主页面
+
+signal save_requested
 
 var _menu_root: Control
 var _paused: bool = false
 var _keybind_menu: CanvasLayer
 var _menu_panel: Panel
+var _save_hint: Label
 
 
 func set_keybind_menu(km: CanvasLayer) -> void:
@@ -34,7 +37,7 @@ func _build_menu() -> void:
 
 	_menu_panel = Panel.new()
 	_menu_panel.name = "MenuPanel"
-	_menu_panel.size = Vector2(300, 330)
+	_menu_panel.size = Vector2(300, 400)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.12, 0.12, 0.14, 0.92)
 	style.border_width_bottom = 2; style.border_width_left = 2
@@ -57,15 +60,23 @@ func _build_menu() -> void:
 	var btn_continue := Button.new()
 	btn_continue.text = "继续游戏"
 	btn_continue.size = Vector2(240, 40)
-	btn_continue.position = Vector2(30, 75)
+	btn_continue.position = Vector2(30, 70)
 	btn_continue.add_theme_font_size_override("font_size", 16)
 	btn_continue.pressed.connect(_resume)
 	_menu_panel.add_child(btn_continue)
 
+	var btn_save := Button.new()
+	btn_save.text = "保存游戏"
+	btn_save.size = Vector2(240, 40)
+	btn_save.position = Vector2(30, 120)
+	btn_save.add_theme_font_size_override("font_size", 16)
+	btn_save.pressed.connect(_on_save)
+	_menu_panel.add_child(btn_save)
+
 	var btn_restart := Button.new()
 	btn_restart.text = "重新开始"
 	btn_restart.size = Vector2(240, 40)
-	btn_restart.position = Vector2(30, 125)
+	btn_restart.position = Vector2(30, 170)
 	btn_restart.add_theme_font_size_override("font_size", 16)
 	btn_restart.pressed.connect(_on_restart)
 	_menu_panel.add_child(btn_restart)
@@ -73,7 +84,7 @@ func _build_menu() -> void:
 	var btn_home := Button.new()
 	btn_home.text = "返回主页面"
 	btn_home.size = Vector2(240, 40)
-	btn_home.position = Vector2(30, 175)
+	btn_home.position = Vector2(30, 220)
 	btn_home.add_theme_font_size_override("font_size", 16)
 	btn_home.pressed.connect(_on_home)
 	_menu_panel.add_child(btn_home)
@@ -81,7 +92,7 @@ func _build_menu() -> void:
 	var btn_keybind := Button.new()
 	btn_keybind.text = "按键设置"
 	btn_keybind.size = Vector2(240, 40)
-	btn_keybind.position = Vector2(30, 225)
+	btn_keybind.position = Vector2(30, 270)
 	btn_keybind.add_theme_font_size_override("font_size", 16)
 	btn_keybind.pressed.connect(_on_keybind)
 	_menu_panel.add_child(btn_keybind)
@@ -89,10 +100,21 @@ func _build_menu() -> void:
 	var btn_quit := Button.new()
 	btn_quit.text = "退出游戏"
 	btn_quit.size = Vector2(240, 40)
-	btn_quit.position = Vector2(30, 275)
+	btn_quit.position = Vector2(30, 320)
 	btn_quit.add_theme_font_size_override("font_size", 16)
 	btn_quit.pressed.connect(_on_quit)
 	_menu_panel.add_child(btn_quit)
+
+	# ── 保存提示 ──
+	_save_hint = Label.new()
+	_save_hint.name = "SaveHint"
+	_save_hint.text = ""
+	_save_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_save_hint.add_theme_font_size_override("font_size", 14)
+	_save_hint.add_theme_color_override("font_color", Color(0.4, 0.9, 0.5))
+	_save_hint.size = Vector2(300, 25)
+	_save_hint.position = Vector2(0, 368)
+	_menu_panel.add_child(_save_hint)
 
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause"):
@@ -129,8 +151,25 @@ func _on_keybind() -> void:
 		_keybind_menu.show()
 
 
+func _on_save() -> void:
+	save_requested.emit()
+	show_save_hint("游戏已保存 ✓")
+
+
 func _on_quit() -> void:
 	get_tree().quit()
+
+
+## 显示保存提示，2 秒后自动消失
+func show_save_hint(text: String) -> void:
+	if not _save_hint:
+		return
+	_save_hint.text = text
+	var t := get_tree().create_timer(2.0)
+	t.timeout.connect(func():
+		if _save_hint:
+			_save_hint.text = ""
+	)
 
 
 ## 窗口缩放时重新居中 + 按比例缩放
@@ -140,5 +179,5 @@ func _layout_menu() -> void:
 	var scale: float = clampf(minf(vs.x / REF.x, vs.y / REF.y), 0.6, 1.6)
 	_menu_panel.scale = Vector2(scale, scale)
 	var pw: float = 300.0 * scale
-	var ph: float = 330.0 * scale
+	var ph: float = 400.0 * scale
 	_menu_panel.position = Vector2((vs.x - pw) / 2.0, (vs.y - ph) / 2.0)

@@ -11,22 +11,64 @@ var _occupied: Array[AABB] = []  # 障碍物/资源/建筑占地区域（建造�
 var _day_night: Node
 var _player: CharacterBody3D
 var _ocean: Node3D
+var _buildings_data: Array[Dictionary] = []  # 建筑记录 [{resource_path, position, rot_y}]
+var _play_time: float = 0.0                 # 累计游玩时间（秒）
+var _save_slot: int = -1                    # 当前存档槽位
+var _game_started: bool = false             # 游戏是否已开始（用于自动存档）
+var _auto_save_timer: float = 0.0            # 自动存档计时器
+var _save_toast: Label                        # 自动存档提示标签
 
 
 func _ready() -> void:
 	# 默认全屏启动
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
 
-	# 先显示角色选择界面
+	# 先显示存档选择界面
+	var SaveSelectScript := load("res://scripts/save_select_screen.gd")
+	var save_select := CanvasLayer.new()
+	save_select.set_script(SaveSelectScript)
+	save_select.name = "SaveSelectScreen"
+	save_select.load_game.connect(_on_load_game)
+	save_select.new_game.connect(_on_new_game)
+	add_child(save_select)
+
+
+func _on_new_game(slot: int) -> void:
+	_save_slot = slot
+	# 移除存档选择界面
+	_remove_save_select()
+
 	var StartScript := load("res://scripts/start_screen.gd")
 	var start_scr := CanvasLayer.new()
 	start_scr.set_script(StartScript)
 	start_scr.name = "StartScreen"
+	start_scr.setup(slot)
 	start_scr.started.connect(_on_game_started)
 	add_child(start_scr)
 
 
-func _on_game_started(model_path: String, skin_path: String) -> void:
+func _on_load_game(save_data: Dictionary, slot: int) -> void:
+	_save_slot = slot
+	_play_time = save_data.get("play_time", 0.0)
+	_remove_save_select()
+
+	var model_path: String = save_data.get("character_model", "res://models/character/character-archer.glb")
+	var skin_path: String = save_data.get("character_skin", "res://models/character/colormap.png")
+
+	_on_game_started(model_path, skin_path, slot)
+
+	# 世界构建完成后恢复存档状态
+	call_deferred("_restore_from_save", save_data)
+
+
+func _remove_save_select() -> void:
+	var ss := get_node_or_null("SaveSelectScreen")
+	if ss:
+		ss.queue_free()
+
+
+func _on_game_started(model_path: String, skin_path: String, save_slot: int) -> void:
+	_save_slot = save_slot
 	# 玩家选好角色后，构建世界
 	_create_lighting()
 	_create_ground()
@@ -45,6 +87,11 @@ func _on_game_started(model_path: String, skin_path: String) -> void:
 	_create_menu()
 	_create_day_night_system()
 	_create_time_display()
+	_game_started = true
+	# 创建自动存档提示
+	_create_save_toast()
+	# 延迟保存初始状态（等所有节点的 _ready 执行完）
+	_save_current_game.call_deferred()
 
 
 # ═══════════════════════════════════════════
@@ -270,7 +317,14 @@ func is_area_free(center: Vector3, half: Vector2) -> bool:
 
 
 ## 放置建筑（由 BuildController 调用，材料已在控制器中扣除）
-func place_building(data: Resource, pos: Vector3, rot_y: float) -> void:
+func place_building(data: Resource, pos: Vector3, rot_y: float, from_save: bool = false) -> void:
+	if not from_save:
+		_buildings_data.append({
+			"resource_path": data.resource_path,
+			"position": pos,
+			"rot_y": rot_y
+		})
+
 	var body := StaticBody3D.new()
 	body.name = "Building_" + data.id
 	body.collision_layer = 1
@@ -447,6 +501,7 @@ func _create_menu() -> void:
 	menu.set_script(MenuScript)
 	menu.name = "MenuManager"
 	add_child(menu)
+	menu.save_requested.connect(_save_current_game)
 
 	var KeybindScript := load("res://scripts/keybind_menu.gd")
 	var keybind := CanvasLayer.new()
@@ -516,3 +571,190 @@ func _create_time_display() -> void:
 	updater.set("day_night", _day_night)
 	updater.set("label", time_label)
 	add_child(updater)
+
+
+# ═══════════════════════════════════════════
+# 游玩时间 & 退出存档
+# ═══════════════════════════════════════════
+
+func _process(delta: float) -> void:
+	if _game_started:
+		_play_time += delta
+		_auto_save_timer += delta
+		if _auto_save_timer >= 60.0:
+			_auto_save_timer = 0.0
+			_save_current_game()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		_save_current_game()
+
+
+# ═══════════════════════════════════════════
+# 存档：收集世界状态 → JSON → 写入磁盘
+# ═══════════════════════════════════════════
+
+func _collect_save_data() -> Dictionary:
+	var data := {
+		"version": 1,
+		"timestamp": Time.get_datetime_string_from_system(),
+		"play_time": _play_time,
+		"character_model": _player.get("_model_path") if _player else "",
+		"character_skin": _player.get("_skin_path") if _player else "",
+		"player": _collect_player_data(),
+		"world": _collect_world_data(),
+	}
+	return data
+
+
+func _collect_player_data() -> Dictionary:
+	if not _player:
+		return {}
+
+	var pos := _player.global_position
+	var health_node: Node = _player.get_health()
+	var hp: float = health_node.get("hp") if health_node else 100.0
+
+	# 背包
+	var inv: Node = _player.get_inventory()
+	var inv_data: Array = []
+	if inv:
+		for st in inv.slots:
+			if st and st.item:
+				inv_data.append({"id": st.item.get("id"), "count": st.count})
+			else:
+				inv_data.append(null)
+
+	# 装备
+	var equip_mgr: Node = _player.get_node_or_null("EquipmentManager")
+	var equip_idx: int = equip_mgr.get_current_index() if equip_mgr else -1
+
+	return {
+		"pos_x": pos.x, "pos_y": pos.y, "pos_z": pos.z,
+		"health": hp,
+		"inventory": inv_data,
+		"equipment_index": equip_idx,
+	}
+
+
+func _collect_world_data() -> Dictionary:
+	var day_time: float = 0.25
+	if _day_night and _day_night.get("game_time") != null:
+		day_time = float(_day_night.get("game_time"))
+
+	var buildings: Array[Dictionary] = []
+	for b in _buildings_data:
+		var bp: Vector3 = b.position
+		buildings.append({
+			"resource_path": b.resource_path,
+			"px": bp.x, "py": bp.y, "pz": bp.z,
+			"rot_y": b.rot_y,
+		})
+
+	return {
+		"day_time": day_time,
+		"buildings": buildings,
+	}
+
+
+func _save_current_game() -> void:
+	if _save_slot < 0 or not _game_started:
+		return
+	var data := _collect_save_data()
+	if SaveManager.save_game(_save_slot, data):
+		_show_save_toast()
+
+
+func _create_save_toast() -> void:
+	var layer := CanvasLayer.new()
+	layer.name = "ToastLayer"
+	layer.layer = 350
+	add_child(layer)
+
+	_save_toast = Label.new()
+	_save_toast.name = "SaveToast"
+	_save_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_save_toast.add_theme_font_size_override("font_size", 15)
+	_save_toast.add_theme_color_override("font_color", Color(0.5, 0.95, 0.6, 1.0))
+	_save_toast.size = Vector2(200, 28)
+	layer.add_child(_save_toast)
+
+
+func _show_save_toast() -> void:
+	if not _save_toast:
+		return
+	var vs := get_viewport().get_visible_rect().size
+	_save_toast.text = "游戏已保存"
+	_save_toast.position = Vector2((vs.x - 200) / 2.0, vs.y - 50)
+	_save_toast.modulate.a = 1.0
+
+	var tw := create_tween()
+	tw.tween_interval(1.0)
+	tw.tween_property(_save_toast, "modulate:a", 0.0, 1.0)
+
+
+# ═══════════════════════════════════════════
+# 存档：从 JSON 恢复世界状态
+# ═══════════════════════════════════════════
+
+func _restore_from_save(data: Dictionary) -> void:
+	if not _player:
+		return
+
+	# ── 玩家状态 ──
+	var pd: Dictionary = data.get("player", {})
+	if not pd.is_empty():
+		_player.global_position = Vector3(
+			pd.get("pos_x", 0.0), pd.get("pos_y", 0.0), pd.get("pos_z", 0.0)
+		)
+
+		var health_node: Node = _player.get_health()
+		if health_node:
+			health_node.set("hp", pd.get("health", 100.0))
+
+		# 背包
+		var inv: Node = _player.get_inventory()
+		if inv:
+			inv.slots.clear()
+			inv.slots.resize(inv.slot_count)
+			var ItemDBScript := load("res://scripts/core/item_db.gd")
+			var ItemStackClass := load("res://scripts/core/item_stack.gd")
+			for i in range(pd.get("inventory", []).size()):
+				var entry = pd["inventory"][i]
+				if entry and entry.get("id"):
+					var item: Resource = ItemDBScript.get_item(entry["id"])
+					if item:
+						inv.slots[i] = ItemStackClass.new(item, int(entry.get("count", 1)))
+			inv.changed.emit()
+
+		# 装备
+		var equip_mgr: Node = _player.get_node_or_null("EquipmentManager")
+		if equip_mgr:
+			var idx: int = pd.get("equipment_index", 0)
+			equip_mgr.equip_index(idx)
+
+	# ── 世界状态 ──
+	var wd: Dictionary = data.get("world", {})
+
+	# 昼夜时间
+	if _day_night and wd.has("day_time"):
+		_day_night.set("game_time", float(wd["day_time"]))
+
+	# 建筑
+	for bd in wd.get("buildings", []):
+		var res_path: String = bd.get("resource_path", "")
+		if res_path.is_empty() or not ResourceLoader.exists(res_path):
+			continue
+		var bres: Resource = load(res_path)
+		if not bres:
+			continue
+		var pos := Vector3(
+			bd.get("px", 0.0), bd.get("py", 0.0), bd.get("pz", 0.0)
+		)
+		var rot_y: float = bd.get("rot_y", 0.0)
+		place_building(bres, pos, rot_y, true)
+
+	print("[World3D] 存档加载完成 (slot %d)" % _save_slot)
+	# 恢复完成后立即保存一次（覆盖 _on_game_started 中的初始保存）
+	_save_current_game.call_deferred()
