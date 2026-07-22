@@ -6,6 +6,7 @@ const OBSTACLE_COUNT: int = 100
 const MINIMAP_SIZE := Vector2(220, 220)
 
 var _obstacle_positions: Array[Vector3] = []
+var _obstacle_data: Array[Dictionary] = []
 var _day_night: Node
 var _player: CharacterBody3D
 
@@ -30,6 +31,7 @@ func _on_game_started(model_path: String, skin_path: String) -> void:
 	_create_obstacles()
 	_create_boundary()
 	_create_player(model_path, skin_path)
+	_create_animals()
 	_create_camera(_player)
 	_create_minimap(_player)
 	_create_equipment_hud(_player)
@@ -206,6 +208,7 @@ func _create_obstacles() -> void:
 		add_child(sb)
 
 		_obstacle_positions.append(pos)
+		_obstacle_data.append({"position": pos, "size": Vector3(w, h, d)})
 
 
 func _make_material_presets() -> Array[StandardMaterial3D]:
@@ -228,7 +231,23 @@ func _create_player(model_path: String, skin_path: String) -> void:
 	_player.position = Vector3(0, 0, 0)
 	_player.set_model_path(model_path)
 	_player.set_skin_path(skin_path)
+	_player.collision_mask = 1  # 只与地面/障碍物碰撞
+	_player.add_to_group("player")
 	add_child(_player)
+
+
+# ═══════════════════════════════════════════
+# 小动物
+# ═══════════════════════════════════════════
+
+func _create_animals() -> void:
+	var AnimalSpawnerScript := load("res://scripts/animal_spawner.gd")
+	var spawner := Node.new()
+	spawner.set_script(AnimalSpawnerScript)
+	spawner.name = "AnimalSpawner"
+	spawner.setup(WORLD_HALF, _obstacle_data, _player.position)
+	add_child(spawner)
+	spawner.spawn_all()
 
 
 # ═══════════════════════════════════════════

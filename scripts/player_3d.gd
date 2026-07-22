@@ -7,8 +7,8 @@ const EquipmentClass := preload("res://scripts/equipment.gd")
 # 动画状态
 enum AnimState { IDLE, RUN, JUMP }
 
-var _model_path: String = "res://models/survivor/characterMedium.fbx"
-var _skin_path: String = "res://models/survivor/survivorMaleB.png"
+var _model_path: String = "res://models/character/character-archer.glb"
+var _skin_path: String = "res://models/character/colormap.png"
 
 @export var speed: float = 9.0
 @export var jump_velocity: float = 15.0
@@ -19,6 +19,7 @@ var _equipment_mgr: Node
 var _model_root: Node3D
 var _anim_player: AnimationPlayer
 var _anim_state: AnimState = AnimState.IDLE
+var _anim_map: Dictionary = {}  # "idle"→实际动画名, "run"→..., "jump"→...
 
 
 func set_model_path(path: String) -> void:
@@ -144,86 +145,34 @@ func _create_collision() -> void:
 
 func _setup_animations() -> void:
 	if not _model_root:
-		print("[Player3D] _setup_animations: _model_root 为空，跳过")
 		return
 
-	print("[Player3D] _setup_animations: 开始加载动画...")
-	# 尝试从导入的 FBX 场景中找 AnimationPlayer
+	# 尝试从 GLB 模型中找自带的 AnimationPlayer
 	_anim_player = _model_root.get_node_or_null("AnimationPlayer") as AnimationPlayer
 	if not _anim_player:
-		_anim_player = AnimationPlayer.new()
-		_anim_player.name = "AnimationPlayer"
-		_model_root.add_child(_anim_player)
-		print("[Player3D] _setup_animations: 创建新的 AnimationPlayer")
-	else:
-		print("[Player3D] _setup_animations: 使用 FBX 自带的 AnimationPlayer")
-
-	# 加载动画（从 FBX 场景中提取 AnimationPlayer 的动画数据）
-	_try_load_anim("idle", "res://models/survivor/animations/idle.fbx")
-	_try_load_anim("run", "res://models/survivor/animations/run.fbx")
-	_try_load_anim("jump", "res://models/survivor/animations/jump.fbx")
-
-	# 有动画就播 idle
-	if _anim_player.has_animation("idle"):
-		_anim_player.play("idle")
-
-
-func _try_load_anim(anim_name: String, path: String) -> void:
-	if not ResourceLoader.exists(path):
-		push_warning("[Player3D] 动画文件不存在: " + path)
 		return
 
-	var anim_scene: PackedScene = load(path)
-	if not anim_scene:
-		push_warning("[Player3D] 动画场景加载失败: " + path)
-		return
+	# GLB 动画名可能不同，建立 状态→实际名 映射
+	var anims := _anim_player.get_animation_list()
+	print("[Player3D] 发现内嵌动画: ", anims)
 
-	# 实例化动画场景（不入树），提取 AnimationPlayer
-	var anim_node: Node = anim_scene.instantiate()
-	print("[Player3D] 动画场景子节点: ", anim_node.get_children().map(func(c): return c.name))
-	var src_ap: AnimationPlayer
-	for child in anim_node.find_children("*", "AnimationPlayer", true, false):
-		src_ap = child
-		break
+	for a in anims:
+		var lower := a.to_lower()
+		if "idle" in lower:
+			_anim_map["idle"] = a
+		elif "run" in lower or "walk" in lower:
+			_anim_map["run"] = a
+		elif "jump" in lower:
+			_anim_map["jump"] = a
 
-	if not src_ap:
-		push_warning("[Player3D] 动画场景中无 AnimationPlayer: " + path)
-		anim_node.queue_free()
-		return
+	# 所有动画设为循环
+	for key in _anim_map:
+		var anim := _anim_player.get_animation(_anim_map[key])
+		if anim:
+			anim.loop_mode = Animation.LOOP_LINEAR
 
-	# 获取主模型骨骼路径（用于重映射）
-	var main_skel_path: String = ""
-	for child in _model_root.find_children("*", "Skeleton3D", true, false):
-		main_skel_path = str(_model_root.get_path_to(child))
-		break
-
-	var anim_skel_path: String = ""
-	for child in anim_node.find_children("*", "Skeleton3D", true, false):
-		anim_skel_path = str(anim_node.get_path_to(child))
-		break
-
-	var lib := AnimationLibrary.new()
-	for a in src_ap.get_animation_list():
-		var anim: Animation = src_ap.get_animation(a)
-		# 如果骨骼路径不一致，重映射 track 路径
-		if main_skel_path != "" and anim_skel_path != "" and anim_skel_path != main_skel_path:
-			anim = _remap_animation_tracks(anim.duplicate(), anim_skel_path, main_skel_path)
-		lib.add_animation(anim_name, anim)
-
-	_anim_player.add_animation_library(anim_name, lib)
-	anim_node.queue_free()
-	print("[Player3D] 动画加载成功: %s (%d tracks)" % [anim_name, src_ap.get_animation_list().size()])
-
-
-## 重映射动画 track 中的骨骼路径（动画场景 → 主模型）
-func _remap_animation_tracks(anim: Animation, from_prefix: String, to_prefix: String) -> Animation:
-	for i in range(anim.get_track_count()):
-		var tp: NodePath = anim.track_get_path(i)
-		var tp_str: String = str(tp)
-		if tp_str.begins_with(from_prefix):
-			var new_path: String = to_prefix + tp_str.substr(from_prefix.length())
-			anim.track_set_path(i, new_path)
-	return anim
+	if _anim_map.has("idle"):
+		_anim_player.play(_anim_map["idle"])
 
 
 func _update_animation(input_length: float) -> void:
@@ -244,14 +193,14 @@ func _update_animation(input_length: float) -> void:
 
 	match new_state:
 		AnimState.IDLE:
-			if _anim_player.has_animation("idle"):
-				_anim_player.play("idle")
+			if _anim_map.has("idle"):
+				_anim_player.play(_anim_map["idle"])
 		AnimState.RUN:
-			if _anim_player.has_animation("run"):
-				_anim_player.play("run")
+			if _anim_map.has("run"):
+				_anim_player.play(_anim_map["run"])
 		AnimState.JUMP:
-			if _anim_player.has_animation("jump"):
-				_anim_player.play("jump")
+			if _anim_map.has("jump"):
+				_anim_player.play(_anim_map["jump"])
 
 
 # ═══════════════════════════════════════════

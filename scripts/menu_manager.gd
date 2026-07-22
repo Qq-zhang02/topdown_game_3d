@@ -136,7 +136,7 @@ func _on_quit() -> void:
 ## 窗口缩放时重新居中 + 按比例缩放
 func _layout_menu() -> void:
 	var vs: Vector2 = get_viewport().get_visible_rect().size
-	const REF: Vector2 = Vector2(1280.0, 720.0)
+	const REF: Vector2 = Vector2(1920.0, 1080.0)
 	var scale: float = clampf(minf(vs.x / REF.x, vs.y / REF.y), 0.6, 1.6)
 	_menu_panel.scale = Vector2(scale, scale)
 	var pw: float = 300.0 * scale

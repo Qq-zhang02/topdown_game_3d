@@ -5,10 +5,7 @@ class_name StartScreen
 # ── 角色数据表 ──
 # 加新角色只需加一行：{id="xxx", name="显示名", path="模型路径"}
 const CHARACTERS := [
-	{id="survivor_male",   name="🧔 男幸存者", path="res://models/survivor/characterMedium.fbx", skin="res://models/survivor/survivorMaleB.png"},
-	{id="survivor_female", name="👩 女幸存者", path="res://models/survivor/characterMedium.fbx", skin="res://models/survivor/survivorFemaleA.png"},
-	{id="zombie_a",        name="🧟 僵尸 A",   path="res://models/survivor/characterMedium.fbx", skin="res://models/survivor/zombieA.png"},
-	{id="zombie_c",        name="🧟 僵尸 C",   path="res://models/survivor/characterMedium.fbx", skin="res://models/survivor/zombieC.png"},
+	{id="archer", name="弓箭手", path="res://models/character/character-archer.glb", skin="res://models/character/colormap.png"},
 ]
 
 signal started(selected_model_path: String, selected_skin_path: String)
@@ -33,6 +30,22 @@ var _grid_cols: int = 7
 var _grid_btn_w: float = 80.0
 var _grid_gap: float = 4.0
 var _grid_start_y: float = 120.0
+
+# 动画预览按钮
+const PREVIEW_ANIMS := [
+	"idle", "walk", "sprint", "jump", "fall", "die", "crouch",
+	"static", "sit", "drive", "pick-up",
+	"attack-melee-left", "attack-melee-right", "attack-kick-left", "attack-kick-right",
+	"holding-both", "holding-both-shoot", "holding-left", "holding-left-shoot",
+	"holding-right", "holding-right-shoot",
+	"interact-left", "interact-right",
+	"emote-no", "emote-yes",
+	"wheelchair-sit", "wheelchair-look-left", "wheelchair-look-right",
+	"wheelchair-move-forward", "wheelchair-move-back", "wheelchair-move-left", "wheelchair-move-right",
+]
+var _anim_buttons: Array[Button] = []
+var _anim_label: Label
+var _playing_anim: bool = false
 
 
 func _ready() -> void:
@@ -141,7 +154,7 @@ func _build_ui() -> void:
 		_grid_buttons.append(btn)
 		_root.add_child(btn)
 
-		if CHARACTERS[i].id == "survivor_male":
+		if CHARACTERS[i].id == "archer":
 			_selected_btn = btn
 			btn.add_theme_stylebox_override("normal", _highlight_style)
 
@@ -165,6 +178,32 @@ func _build_ui() -> void:
 	_start_btn.pressed.connect(_on_start)
 	_root.add_child(_start_btn)
 
+	# ── 动画预览按钮 ──
+	_anim_label = Label.new()
+	_anim_label.text = "动画预览："
+	_anim_label.add_theme_font_size_override("font_size", 13)
+	_anim_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.7))
+	_anim_label.size = Vector2(250, 20)
+	_anim_label.position.y = 500
+	_root.add_child(_anim_label)
+
+	var cols := 7
+	var anim_btn_w: float = 140.0
+	var anim_btn_h: float = 22.0
+	var anim_gap: float = 3.0
+
+	for i in range(PREVIEW_ANIMS.size()):
+		var row: int = i / cols
+		var col: int = i % cols
+		var btn := Button.new()
+		btn.text = PREVIEW_ANIMS[i]
+		btn.size = Vector2(anim_btn_w, anim_btn_h)
+		btn.position = Vector2(col * (anim_btn_w + anim_gap), 525 + row * (anim_btn_h + anim_gap))
+		btn.add_theme_font_size_override("font_size", 10)
+		btn.pressed.connect(_play_preview_anim.bind(i))
+		_anim_buttons.append(btn)
+		_root.add_child(btn)
+
 
 func _on_model_clicked(idx: int, btn: Button) -> void:
 	if _selected_btn:
@@ -182,6 +221,7 @@ func _update_preview() -> void:
 	if _preview_model:
 		_preview_model.queue_free()
 		_preview_model = null
+	_playing_anim = false
 
 	if not ResourceLoader.exists(_selected_path):
 		return
@@ -249,14 +289,36 @@ func _on_start() -> void:
 
 
 func _process(delta: float) -> void:
-	if _preview_model:
+	if _preview_model and not _playing_anim:
 		_preview_model.rotation.y -= delta * 1.2
+
+
+func _play_preview_anim(idx: int) -> void:
+	if not _preview_model:
+		return
+	var ap := _preview_model.get_node_or_null("AnimationPlayer") as AnimationPlayer
+	if not ap:
+		return
+	var anim_name: String = PREVIEW_ANIMS[idx]
+	if not ap.has_animation(anim_name):
+		return
+
+	_playing_anim = true
+	ap.play(anim_name)
+	# 播放完后恢复旋转
+	var anim := ap.get_animation(anim_name)
+	if anim:
+		get_tree().create_timer(anim.length).timeout.connect(_on_anim_done)
+
+
+func _on_anim_done() -> void:
+	_playing_anim = false
 
 
 ## 响应窗口缩放，重新计算位置 + 按比例缩放
 func _layout_ui() -> void:
 	var vs: Vector2 = get_viewport().get_visible_rect().size
-	const REF: Vector2 = Vector2(1280.0, 720.0)
+	const REF: Vector2 = Vector2(1920.0, 1080.0)
 
 	# 整体缩放
 	var scale: float = clampf(minf(vs.x / REF.x, vs.y / REF.y), 0.6, 1.6)
@@ -286,3 +348,15 @@ func _layout_ui() -> void:
 	var bottom_x: float = preview_margin + 5.0
 	_sel_label.position.x = bottom_x
 	_start_btn.position.x = bottom_x
+	_anim_label.position.x = bottom_x
+
+	var anim_cols := 7
+	var anim_btn_w: float = 140.0
+	var anim_btn_h: float = 22.0
+	var anim_gap: float = 3.0
+	var anim_start_y: float = 525.0
+
+	for i in range(_anim_buttons.size()):
+		var row: int = i / anim_cols
+		var col: int = i % anim_cols
+		_anim_buttons[i].position = Vector2(bottom_x + col * (anim_btn_w + anim_gap), anim_start_y + row * (anim_btn_h + anim_gap))

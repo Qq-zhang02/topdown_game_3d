@@ -1,363 +1,287 @@
-# TopDownGame3D — 项目说明书
+# TopDownGame3D v2.1 — 项目交接文档
 
-> Godot 4.7.1 · 俯视角 3D · 纯 GDScript 代码构建 · 2026-07 · v2.1
-
----
-
-## 一、项目概览
-
-| 属性 | 值 |
-|------|-----|
-| **路径** | `F:/godot_stuff/projects/topdown_game_3d-v2/` |
-| **引擎** | Godot 4.7.1 |
-| **渲染** | Forward+（3D） |
-| **分辨率** | 自适应全屏（默认 1920×1080） |
-| **语言** | GDScript |
-| **场景** | 2 个 .tscn（main + player），其余全部代码生成 |
-| **模型** | Kenney Animated Characters Survivors（FBX，4 皮肤） |
-| **FBX 转换** | FBX2glTF（位于 `%APPDATA%\Godot\editor_data\`） |
-| **Git 仓库** | https://github.com/Qq-zhang02/topdown_game_3d-v2 |
+> Godot 4.7.1 · 俯视角 3D · 全 GDScript · 2026-07-22
 
 ---
 
-## 二、目录结构
+## 1. 项目路径
+
+```
+F:/godot_stuff/projects/topdown_game_3d-v2/
+```
+
+Godot 可执行文件：
+```
+F:/godot_stuff/install_sites/Godot_v4.7.1-stable_win64.exe/Godot_v4.7.1-stable_win64.exe
+```
+
+GitHub (私有)：`https://github.com/Qq-zhang02/topdown_game_3d-v2`
+
+---
+
+## 2. 目录结构
 
 ```
 topdown_game_3d-v2/
-├── project.godot                     # 项目配置 + 输入映射（7 个动作）
-├── PROJECT_REPORT.md                 # 📋 本文档
-├── .gitignore                        # 排除 .godot/ 导入缓存
+├── project.godot              # 项目配置
+├── .gitignore                 # 排除 .godot/
 ├── scenes/
-│   ├── main.tscn                     # 入口（Node3D + world_3d.gd）
-│   └── player.tscn                   # 玩家（CharacterBody3D + player_3d.gd）
+│   ├── main.tscn              # 入口 (Node3D → world_3d.gd)
+│   └── player.tscn            # 玩家 (CharacterBody3D → player_3d.gd)
 ├── scripts/
-│   ├── world_3d.gd                   # 🌍 世界总调度
-│   ├── player_3d.gd                  # 🎮 玩家：移动/跳跃/朝向/装备/动画
-│   ├── camera_follow_3d.gd           # 📷 俯视角跟随摄像机（含瞄准系统）
-│   ├── day_night_cycle.gd            # 🌞🌙 24h 昼夜循环
-│   ├── equipment.gd                  # 🔦 装备数据类（Resource）
-│   ├── equipment_manager.gd          # 🔄 装备管理器（装备/卸下/切换）
-│   ├── equipment_hud.gd              # 🖥️ 底部装备栏（显示 equipped=true 项）
-│   ├── minimap_3d.gd                 # 🗺️ 左上角小地图
-│   ├── start_screen.gd               # 🎬 角色选择界面 + CHARACTERS 数据表
-│   ├── menu_manager.gd               # ⏸️ ESC 暂停菜单
-│   └── keybind_menu.gd               # ⌨️ 按键设置面板
-└── models/
-    └── survivor/                      # 幸存者模型
-        ├── characterMedium.fbx        # 角色模型（骨架+网格）
-        ├── animations/
-        │   ├── idle.fbx               # 待机动画
-        │   ├── run.fbx                # 奔跑动画
-        │   └── jump.fbx               # 跳跃动画
-        ├── survivorMaleB.png          # 男幸存者皮肤
-        ├── survivorFemaleA.png        # 女幸存者皮肤
-        ├── zombieA.png                # 僵尸 A 皮肤
-        └── zombieC.png                # 僵尸 C 皮肤
+│   ├── world_3d.gd            # 世界总管：光照/地面/障碍物/边界/玩家/摄像机/小地图/菜单/昼夜/动物
+│   ├── player_3d.gd           # 玩家：移动/跳跃/朝向/装备/动画/碰撞/皮肤
+│   ├── camera_follow_3d.gd    # 摄像机：跟随 + 右键瞄准偏移
+│   ├── animal_spawner.gd      # 动物生成器：随机散布小动物到世界
+│   ├── animal_behavior.gd     # 动物行为：随机弹跳 + 被撞翻滚 + 代码推挤
+│   ├── day_night_cycle.gd     # 24h 昼夜循环
+│   ├── equipment.gd           # 装备 Resource 数据类
+│   ├── equipment_manager.gd   # 装备管理器
+│   ├── equipment_hud.gd       # 底部装备栏 UI
+│   ├── minimap_3d.gd          # 小地图
+│   ├── start_screen.gd        # 角色选择界面 + CHARACTERS 表
+│   ├── menu_manager.gd        # ESC 暂停菜单（含全屏启动）
+│   └── keybind_menu.gd        # 按键设置面板
+├── models/
+│   ├── survivor/              # 主角模型
+│   │   ├── characterMedium.fbx    # 骨架+网格
+│   │   ├── animations/
+│   │   │   ├── idle.fbx          # 待机
+│   │   │   ├── run.fbx           # 奔跑
+│   │   │   └── jump.fbx          # 跳跃
+│   │   ├── survivorMaleB.png     # 男皮肤
+│   │   ├── survivorFemaleA.png   # 女皮肤
+│   │   ├── zombieA.png           # 僵尸A皮肤
+│   │   └── zombieC.png           # 僵尸C皮肤
+│   └── animals/              # 24种动物 (Cube Pets GLB)
+│       ├── animal-*.glb ×24
+│       └── Textures/colormap.png
+└── PROJECT_HANDOFF.md        # 本文档
 ```
 
 ---
 
-## 三、启动流程
+## 3. 启动流程
 
 ```
-F5 运行
+world_3d._ready()
+  ├── DisplayServer 全屏
+  ├── StartScreen (选角色界面)
+  │     └── 选皮肤 → 点"开始游戏"
+  │           └── started.emit(model_path, skin_path)
   │
-  world_3d._ready()
-  ├── StartScreen                         ← 角色选择界面
-  │     │
-  │     │  选角色 + 点「开始游戏」
-  │     │
-  │     started.emit(model_path)
-  │
-  _on_game_started(model_path)
-  ├── _create_lighting()                  ← 太阳光/月光/环境
-  ├── _create_ground()                    ← 100m 噪声纹理草地
-  ├── _create_obstacles()                 ← 100 个方块（4 种材质）
-  ├── _create_boundary()                  ← 四面墙
-  ├── _create_player(model_path)          ← 加载 GLB → 缩放 → 碰撞体
-  ├── _create_camera(player)              ← Camera3D 俯视跟随
-  ├── _create_minimap(player)             ← 左上角 2D 小地图
-  ├── _create_equipment_hud(player)       ← 底部装备栏
-  ├── _create_menu()                      ← ESC 暂停 + 按键设置
-  └── _create_day_night_system()          ← 24 秒一个昼夜
+  _on_game_started(model_path, skin_path)
+  ├── _create_lighting()      → SunLight + MoonLight + WorldEnvironment
+  ├── _create_ground()        → 100m×100m 噪声草地 + StaticBody3D
+  ├── _create_obstacles()     → 100 个随机方块 (4种材质, 1~4m宽, 1.5~5m高)
+  ├── _create_boundary()      → 四面 3m 高墙
+  ├── _create_player()        → 实例化 player.tscn, set_model_path/skin_path, 碰撞层1, 加入"player"组
+  ├── _create_animals()       → AnimalSpawner: 30只随机动物散布世界
+  ├── _create_camera()        → CameraFollow3D (10m高, 52°俯角)
+  ├── _create_minimap()       → 220×220 左上角小地图
+  ├── _create_equipment_hud() → 底部装备栏
+  ├── _create_menu()          → MenuManager + KeybindMenu (全屏启动)
+  └── _create_day_night_system() → 24秒一天, time_scale=60
 ```
 
 ---
 
-## 四、操作说明
+## 4. 操作
 
-| 按键 | 功能 | 默认键 |
-|------|------|--------|
-| 移动 | WASD 四方向 | W/A/S/D |
-| 朝向 | 鼠标位置 | — |
-| 跳跃 | 仅限地面 | Space |
-| 切换装备 | 关→手电→火把→关 | F |
-| 瞄准 | 摄像机跟随鼠标偏移（移速减半） | 鼠标右键（按住） |
-| 暂停 | 菜单 | Esc |
-
-按键可在游戏中修改：**Esc → 按键设置**，配置持久化到 `user://keybinds.cfg`。
-
----
-
-## 五、核心系统
-
-### 5.1 角色数据表
-
-位置：`start_screen.gd` CHARACTERS 常量
-
-```gdscript
-const CHARACTERS := [
-    {id="survivor_male",   name="🧔 男幸存者", path="...", skin="...MaleB.png"},
-    {id="survivor_female", name="👩 女幸存者", path="...", skin="...FemaleA.png"},
-    {id="zombie_a",        name="🧟 僵尸 A",   path="...", skin="zombieA.png"},
-    {id="zombie_c",        name="🧟 僵尸 C",   path="...", skin="zombieC.png"},
-]
-```
-
-| 字段 | 说明 |
+| 按键 | 功能 |
 |------|------|
-| `id` | 唯一标识 |
-| `name` | 按钮显示文字（支持 emoji） |
-| `path` | 模型 FBX 路径（共用同一模型） |
-| `skin` | 皮肤 PNG 纹理路径 |
+| WASD | 移动 |
+| 鼠标 | 朝向 |
+| Space | 跳跃 |
+| F | 切换装备 (关→手电→火把→关) |
+| 鼠标右键(按住) | 瞄准 (摄像机偏移, 移速减半) |
+| Esc | 暂停菜单 (继续/重开/主页/按键/退出) |
 
-**加新皮肤**：放 PNG 到 models/survivor/ → 表里加一行。默认选中 = `CHARACTERS[0]`（男幸存者）。
+---
 
-### 5.2 装备系统
+## 5. 碰撞层
+
+| 层 | 对象 | mask |
+|----|------|------|
+| 1 | 地面、障碍物、边界、玩家 | 玩家mask=1, 障碍物mask=1 |
+| 2 | 动物 (RigidBody3D) | mask=1 (只碰撞地面/障碍物) |
+
+**关键**：玩家和动物之间 **没有物理碰撞**，互推完全由 `animal_behavior.gd` 的 `_check_player_push()` 代码驱动。玩家在 `world_3d.gd` 中加入 `"player"` 组供动物检测。
+
+---
+
+## 6. 脚本详解
+
+### 6.1 player_3d.gd — 玩家
 
 ```
-Equipment (Resource)
-├── id, display_name       # 标识/显示名
-├── equipped: bool         # 是否在循环中（决定装备栏可见+F键可达）
-├── light_type: SPOT/OMNI  # 光源类型
-├── light_color/energy     # 颜色/亮度
-├── spot_range/omni_range  # 射程
-└── position_offset        # 相对玩家偏移
-
-EquipmentManager (Node)
-├── equipment_list          # 全部装备
-├── _current_index          # 当前装备索引（-1=关）
-├── cycle_next()            # 只遍历 equipped=true 的项
-├── get_count()             # equipped 项数量
-├── get_active_slot()       # 当前在装备栏的槽位
-└── get_name_at(slot)       # 第 slot 个已装备项的名字
+CharacterBody3D
+├── 属性: speed(9.0), jump_velocity(15), gravity(35), vision_range(5)
+├── _model_path / _skin_path: 由 world_3d 在 add_child 前设置
+├── _create_model(): 加载 FBX → 缩放至1.5m → 应用皮肤 → 关阴影
+├── _create_collision(): 基于 AABB.get_center() 生成胶囊碰撞体
+├── _setup_animations(): 从动画FBX提取 AnimationPlayer → 加载 idle/run/jump
+├── _update_animation(): IDLE/RUN/JUMP 状态机
+├── _face_mouse(): 获取鼠标地面坐标 → look_at
+├── get_mouse_ground_position(): 射线检测鼠标在地面位置
+├── is_aiming(): 检测右键按下
+└── _physics_process(): 重力→跳跃→WASD→move_and_slide→朝向→动画
 ```
 
-**已有装备**：手电筒（SpotLight 50m）/ 火把（OmniLight 12m），默认都 `equipped=true`。
+### 6.2 camera_follow_3d.gd — 摄像机
 
-**加新装备**：在 `player_3d.gd` 里加工厂函数 + `add_equipment()`，设 `equipped=true` 即可出现在循环中。
-
-### 5.3 昼夜循环
-
-| 参数 | 值 |
-|------|-----|
-| 速度 | 1 真秒 = 60 游分（24 秒一天） |
-| 起始 | 6:00 AM |
-| 太阳 | 绕 X 轴，6:00=地平线, 12:00=天顶 |
-| 月亮 | 太阳对面（+180°），蓝白柔光 |
-| 过渡 | 黎明/黄昏暖橙 ↔ 正午白 ↔ 夜蓝 |
-
-### 5.4 摄像机
-
-- Camera3D 透视投影
-- 玩家上方 10m + 向后倾斜偏移（~52° 俯角），可看到角色正面
-- 看向角色上半身（y ≈ 1.0m），不再只看到脑袋顶
-- **瞄准模式**：按住鼠标右键 → 摄像机随鼠标方向水平偏移，偏移速度由慢到快
-- 最大偏移 = `vision_range`（默认 5.0m，即角色「视力」属性）
-- 偏移速度：初始 5 → 加速 18/s → 最大 22，松开右键匀速归位
-- 瞄准时角色移动速度减半
-
-### 5.5 小地图
-
-- CanvasLayer → Control._draw()
-- 3D 坐标 XZ → 2D 小地图 XY
-- 显示：玩家（黄点+朝向三角）、障碍物（灰点）、边界
-
-### 5.6 键位系统
-
-- 位置：`keybind_menu.gd`
-- 7 个动作（移动×4 + 切换装备 + 跳跃 + 暂停），均支持自定义键位
-- 每个动作配有 `default` 硬编码默认键，重置时直接写回
-- 保存到 `user://keybinds.cfg`，启动时自动加载
-- 改键后发 `bindings_changed` 信号 → 装备栏标签实时刷新
-- ESC 保护：只允许绑定到「暂停」
-
-### 5.7 UI 层级
-
-| 组件 | layer | 说明 |
-|------|-------|------|
-| StartScreen | 500 | 角色选择（左 3D 预览 + 右 7 列网格） |
-| KeybindMenu | 400 | 按键设置面板 |
-| MenuManager | 300 | ESC 暂停：继续/重开/主页/按键/退出 |
-| Minimap | 100 | 左上角 |
-| EquipmentHUD | 50 | 底部装备栏（F 提示 + 10 格） |
-
----
-
-## 六、玩家脚本 (player_3d.gd)
-
-| 变量 | 类型 | 说明 |
-|------|------|------|
-| `_model_path` | String | 当前模型路径，可通过 `set_model_path()` 在实例化前设 |
-| `_skin_path` | String | 皮肤纹理路径，通过 `set_skin_path()` 设置 |
-| `_model_root` | Node3D | 加载的场景根节点 |
-| `_equipment_mgr` | Node | EquipmentManager 引用 |
-| `_anim_player` | AnimationPlayer | 动画播放器 |
-| `_anim_state` | AnimState | 当前动画状态（IDLE/RUN/JUMP） |
-| `speed` | @export float (9.0) | 移动速度 |
-| `jump_velocity` | @export float (15.0) | 跳跃力度 |
-| `gravity` | @export float (35.0) | 重力 |
-| `vision_range` | @export float (5.0) | 视力属性，瞄准时摄像机最大偏移 |
-
-**关键方法**：
-- `set_model_path(path)` / `set_skin_path(path)` — 选角界面调用，必须在 `add_child` 前设置
-- `_create_model()` — 加载模型、自动缩放至 1.5m、应用皮肤纹理
-- `_create_collision()` — 基于包围盒自动生成胶囊碰撞体
-- `_setup_animations()` — 从动画 FBX 提取 AnimationPlayer，加载 idle/run/jump
-- `_update_animation()` — 根据移动状态切换动画（静止→idle，移动→run，跳跃→jump）
-- `_physics_process()` — 重力→跳跃→WASD→move_and_slide→look_at→更新动画
-
----
-
-## 七、输入映射 (project.godot)
-
-| 动作名 | 默认键 | physical_keycode |
-|--------|--------|------------------|
-| `move_up` | W | 87 |
-| `move_down` | S | 83 |
-| `move_left` | A | 65 |
-| `move_right` | D | 68 |
-| `cycle_equipment` | F | 70 |
-| `jump` | Space | 32 |
-| `pause` | Esc | 4194305 |
-
----
-
-## 八、世界参数 (world_3d.gd)
-
-| 常量 | 值 | 说明 |
-|------|-----|------|
-| `WORLD_HALF` | 50.0 | 半边长，总世界 100×100m |
-| `OBSTACLE_COUNT` | 100 | 障碍物数量 |
-| `MINIMAP_SIZE` | (220, 220) | 小地图像素尺寸 |
-
----
-
-## 九、⚠️ 开发注意事项（必读）
-
-### 9.1 class_name 跨文件引用
-
-Godot 4.7 脚本解析顺序不确定，**禁止**用其他脚本的 `class_name` 作为类型标注。始终用 `preload()/load()`：
-
-```gdscript
-# ❌
-var mgr: EquipmentManager = ...
-
-# ✅
-const EQ = preload("res://scripts/equipment.gd")
-var eq = EQ.new()
-eq.set("id", "flashlight")  # 用 .set() 而非 .属性名
+```
+Camera3D
+├── HEIGHT=10.0, TILT_ANGLE=52°
+├── 基础位置: 玩家上方10m + 向后偏移(cos52°×10=6.16m)
+├── 瞄准模式:
+│   ├── 按住右键 → 计算鼠标地面位置 → 偏移量=vision_range × 距离比
+│   ├── 速度: 初始5 → 加速18/s → 上限22
+│   └── 松开右键 → 匀速20归位
+├── look_at 目标随偏移同步移动 (保持视角不变)
+└── 偏移仅 XZ 平面 (y=0)
 ```
 
-### 9.2 修改代码需重启 Godot
+### 6.3 animal_spawner.gd — 动物生成器
 
-编辑器缓存脚本，外部修改不自动重载。每次改脚本 → 关闭 Godot → 重新打开 → F5。（这一条存疑，会自动重载）
+```
+Node (由 world_3d 创建)
+├── count=30, min_scale=0.15, max_scale=0.35
+├── setup(world_half, obstacle_data, player_pos)
+├── spawn_all():
+│   ├── 随机位置 → 检测是否与障碍物重叠 (AABB + 6m安全距)
+│   ├── 远离玩家5m+
+│   └── _spawn_animal(model, pos, scale, rotY)
+└── _spawn_animal():
+    ├── RigidBody3D: mass=1.0, layer=2, mask=1, damp=0.6
+    ├── 加载 GLB → 缩放 → 旋转
+    ├── CapsuleShape3D: radius=0.25×scale, height=0.6×scale
+    ├── 关阴影
+    └── 挂载 AnimalBehavior 脚本 (hop_impulse 1.5~3.0, hop_up 2.5~5.0)
+```
 
-### 9.3 CanvasLayer 子节点尺寸
+### 6.4 animal_behavior.gd — 动物行为
 
-CanvasLayer 不是 Control，`PRESET_FULL_RECT` 锚点无效。UI 尺寸必须用 `get_viewport().get_visible_rect().size` 手动获取。
+```
+Node (挂在每只动物的 RigidBody3D 上)
+├── 弹跳: 每1~4s → apply_central_impulse(随机方向×hop_impulse + UP×hop_up)
+├── 推挤: _check_player_push(delta) 每帧检测
+│   ├── 距离<0.5m → force = mass × push_multiplier(3.0) × 距离比
+│   ├── apply_central_force(away×force + UP×force×0.3)
+│   └── 进入翻滚状态
+├── 翻滚: 解锁 angular_x/z → 随机扭矩 → 0.7s后重锁 → rotation=(0,y_rot,0)
+└── 平时: axis_lock_angular_x/z=true (保持头上脚下)
+```
 
-### 9.4 模型导入
+### 6.5 world_3d.gd — 世界总管
 
-- GLB 贴图是相对路径，必须保持 `GLB` 和 `Textures/` 的相对关系
-- 贴图变动后删 `.godot/` 文件夹重建导入缓存
-- 动物共用 `colormap.png`，方块人各用 `texture-*.png`
+```
+Node3D
+├── 常量: WORLD_HALF=50, OBSTACLE_COUNT=100
+├── 存储: _obstacle_positions (给小地图), _obstacle_data (给动物生成器)
+├── _create_obstacles(): 随机方块 ×100, 记录 position+size 到两个数组
+├── _create_animals(): 创建 AnimalSpawner → setup → spawn_all
+├── _create_player(): 设置 collision_mask=1, add_to_group("player")
+└── _ready(): DisplayServer.window_set_mode(FULLSCREEN) 启动全屏
+```
 
-### 9.5 模型预览
+### 6.6 start_screen.gd — 角色选择
 
-- SubViewport 内：`look_at_from_position()` 替代 `look_at()`
-- 模型必须先 `add_child()` 入树再用 `global_transform` 算包围盒
-- 初始角度 `PI/4`（45°正面），自转方向顺时针（`-= delta * 1.2`）
+```
+CanvasLayer (layer=500)
+├── CHARACTERS 表: 4条 (男/女幸存者, 僵尸A/C)
+├── 信号: started(model_path, skin_path)
+├── 左: 3D预览 (SubViewport, 自动缩放适配)
+├── 右: 角色网格按钮
+├── _apply_preview_skin(): 加载选中皮肤贴到预览模型
+└── _layout_ui(): 窗口缩放时重算位置+比例 (REF=1920×1080, scale=0.6~1.6)
+```
 
-### 9.6 键位系统
+### 6.7 menu_manager.gd — 暂停菜单
 
-- `InputEventKey` 必须同时设 `keycode` 和 `physical_keycode`，Godot 靠后者检测
-- 改动作名后需删 `user://keybinds.cfg`，不然旧名条目残留
+```
+CanvasLayer (layer=300)
+├── 5按钮: 继续/重开/主页/按键/退出
+├── 面板大小 300×330, 居中+比例缩放
+├── _input(): ESC 切换暂停
+└── _on_restart/_on_home: reload_current_scene()
+```
 
----
+### 6.8 其他脚本
 
-## 十、常见修改速查
-
-| 需求 | 位置 |
+| 脚本 | 功能 |
 |------|------|
-| 换默认角色 | `player_3d.gd` `_model_path` 变量 |
-| 加新角色 | GLB 放 models → `start_screen.gd` CHARACTERS 表加一行 |
-| 改角色名/emoji | CHARACTERS 表 `name` 字段 |
-| 删角色 | CHARACTERS 表删该行 |
-| 改移动速度 | `player_3d.gd` `@export var speed` |
-| 改跳跃 | `player_3d.gd` `jump_velocity` / `gravity` |
-| 加新装备 | `player_3d.gd` 工厂函数 + `add_equipment()` + `equipped=true/false` |
-| 改昼夜速度 | `world_3d.gd` `_create_day_night_system()` 的 `time_scale` |
-| 改障碍物/世界大小 | `world_3d.gd` `OBSTACLE_COUNT` / `WORLD_HALF` |
-| 改摄像机高度 | `camera_follow_3d.gd` `HEIGHT` |
-| 改视力/瞄准偏移 | `player_3d.gd` `@export var vision_range` |
-| 改瞄准加速度 | `camera_follow_3d.gd` `AIM_ACCEL` / `AIM_MAX_SPEED` |
-| Git 推送备份 | `git add -A && git commit -m "..." && git push && git push --tags` |
-| 改预览旋转速度 | `start_screen.gd` `_process` 的 `delta * 1.2` |
-| 加新键位动作 | `keybind_menu.gd` ACTIONS 数组加一行 |
-| 导出游戏 | 编辑器：管理导出模板 → 下载 x86_64 → 项目→导出→Windows |
-| 删键位配置 | `%APPDATA%\Godot\app_userdata\TopDownGame3D\keybinds.cfg` |
-| 导出模板路径 | `%APPDATA%\Godot\export_templates\4.7.1.stable\` |
+| `keybind_menu.gd` | 按键设置, 7动作, 持久化 `user://keybinds.cfg` |
+| `equipment.gd` | Equipment Resource: id/name/light_type/color/range/offset |
+| `equipment_manager.gd` | 装备循环, cycle_next(), get_count() |
+| `equipment_hud.gd` | 底部10格装备栏, F键标签, 窗口缩放自适应 |
+| `minimap_3d.gd` | CanvasLayer._draw(), 黄点玩家+朝向, 灰点障碍物 |
+| `day_night_cycle.gd` | 24秒一天, 太阳绕X轴, 月亮对面, 光色过渡 |
 
 ---
 
-## 十一、修复记录
+## 7. 动物系统当前状态
 
-### 11.1 角色碰撞体偏移修复 (2026-07-21)
+### 行为
+- ✅ 随机弹跳移动 (每1~4秒, 随机方向)
+- ✅ 被玩家靠近推挤 (代码驱动, 无物理碰撞)
+- ✅ 被撞翻滚 (解锁旋转轴, 随机扭矩)
+- ✅ 翻滚后恢复站立 (重锁X/Z轴 + rotation重置)
+- ✅ 玩家永不被动物推飞 (无物理双向碰撞, mass=1.0)
 
-**问题**：胶囊碰撞体与角色模型不对齐——碰撞体正面超出模型过多，背面缩在模型内部。
+### 可调参数 (animal_behavior.gd)
+```
+hop_impulse=2.0      # 弹跳水平冲量 (生成时随机 1.5~3.0)
+hop_up=3.5           # 弹跳垂直冲量 (生成时随机 2.5~5.0)
+push_multiplier=3.0  # 推力倍数 (force = mass × this × 距离比)
+min_hop_interval=1.0
+max_hop_interval=4.0
+TUMBLE_TIME=0.7      # 翻滚持续时间
+PUSH_DISTANCE=0.5    # 推挤检测距离
+```
 
-**原因**：`player_3d.gd` 第 102 行 `col.position = Vector3(0, aabb.size.y * 0.45, 0) + aabb.position` 中，`AABB.position` 在 Godot 4 中是最小角（minimum corner），不是几何中心。X、Z 轴直接使用了最小角坐标，导致碰撞体偏移了半个模型的宽度/深度。
+### 可调参数 (animal_spawner.gd)
+```
+count=30
+min_scale=0.15, max_scale=0.35
+spawn_margin=6.0     # 离障碍物安全距离
+```
 
-**修复**：改为 `col.position = to_local(aabb.position + aabb.size * 0.5)`，使用 AABB 几何中心 + `to_local()` 确保坐标正确转换到 CharacterBody3D 本地空间。
+---
 
-### 11.2 摄像机调低 + 瞄准系统 (2026-07-22)
+## 8. 已知问题 / 注意事项
 
-**改动**：
-- 摄像机高度 35m → 10m，俯角 70° → 52°，看向角色上半身而非地面
-- 新增瞄准模式：按住鼠标右键 → 摄像机随鼠标方向水平偏移
-- 鼠标离角色越远偏移越多，最大偏移 = `vision_range`（默认 5.0m）
-- 偏移速度由慢到快加速（初始 5，加速度 18/s，最大 22）
-- 松开右键匀速归位（速度 20）
-- 瞄准时角色移动速度减半
-- `vision_range` 为玩家「视力」属性（`@export`，后续装备可加成）
+1. **FBX 动画**：需要 FBX2glTF (已安装在 `%APPDATA%\Godot\editor_data\`)。当前动画通过代码从动画 FBX 提取 AnimationPlayer 实现，可能不稳定。
+2. **模型朝向**：`player_3d.gd` 第58行 `_model_root.rotation.y = PI`，针对幸存者模型可能需要调整。
+3. **class_name 引用**：Godot 4.7 不建议用其他脚本的 class_name 做类型标注，用 `load()` 替代。
+4. **GDScript 类型推断**：从 `Node3D` 调用的动态方法（如 `target.get_mouse_ground_position()`）需要用显式类型标注 `: Vector3 =`。
+5. **AABB.position**：Godot 4 中是 minimum corner，不是中心。用 `aabb.position + aabb.size * 0.5` 或 `aabb.get_center()`。
+6. **UI 缩放**：所有 UI 以 1920×1080 为参考分辨率，scale 范围 0.6~1.6。
+7. **全屏**：在 `world_3d.gd` `_ready()` 中代码设置，非 project.godot 设置。
+8. **Git**：`.gitignore` 排除 `.godot/`。提交用 `git push --force` 覆盖 v2.1 标签。
 
-### 11.3 UI 自适应缩放 (2026-07-22)
+---
 
-**问题**：窗口放大/缩小后，开始界面、暂停菜单、按键设置面板位置错乱，不会按比例缩放。
+## 9. Git 操作
 
-**修复**：三个 UI 脚本均以 1280×720 为参考分辨率，缩放范围 0.6~1.6：
-- `menu_manager.gd`：面板居中 + 比例缩放 + 监听 `size_changed`
-- `keybind_menu.gd`：同上
-- `start_screen.gd`：`_root` 整体缩放 + 居中，内部元素自适应
-- `equipment_hud.gd`：监听 `size_changed` 重算水平居中
+```bash
+# 提交
+cd F:/godot_stuff/projects/topdown_game_3d-v2
+git add -A
+git commit -m "描述"
+git push --force
+git tag -d v2.1 && git tag -a v2.1 -m "v2.1" && git push --tags --force
 
-### 11.4 幸存者模型替换 (2026-07-22)
+# 回退
+git checkout v2.1 -- .
+```
 
-- 删除旧模型（animals/、blocky/），替换为 Kenney Animated Characters Survivors
-- 安装 FBX2glTF 到 `%APPDATA%\Godot\editor_data\`，解决 FBX 纹理/动画丢失
-- 4 皮肤系统：男/女幸存者 + 2 种僵尸，共用同一模型不同纹理
-- 动画状态机：idle（静止）/ run（移动）/ jump（跳跃），自动切换
+---
 
-### 11.5 全屏 + 分辨率 (2026-07-22)
+## 10. 开发提示
 
-- 默认全屏启动（`world_3d.gd` 代码控制）
-- `project.godot` 默认分辨率 1920×1080
-- 全屏自动适配显示器原生分辨率
-
-### 11.6 Git 版本备份 (2026-07-22)
-
-- 初始化 Git 仓库，`.gitignore` 排除 `.godot/`（导入缓存 397MB）
-- 实际版本控制仅 ~1.3MB
-- 推送至 GitHub 私有仓库：https://github.com/Qq-zhang02/topdown_game_3d-v2
-- 标签 `v2.1`
+- 修改 `.gd` 文件后，Godot 编辑器会自动检测并重载 (4.7)
+- `get_tree().root.size_changed` 是 UI 自适应缩放的关键信号
+- `DisplayServer.window_set_mode()` 是控制全屏/窗口的 API
+- 角色朝向由 `_face_mouse()` 每帧调用 `look_at` 实现
+- 动物使用 `get_nodes_in_group("player")` 查找玩家
