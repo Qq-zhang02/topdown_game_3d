@@ -13,7 +13,7 @@ var _skin_path: String = "res://models/character/colormap.png"
 @export var speed: float = 5.0
 @export var jump_velocity: float = 15.0
 @export var gravity: float = 35.0
-@export var reaction_speed: float = 1.0  # 反应速度，越高转向越灵敏
+@export var rotation_lag: float = 0.0  # 转向迟滞，越高转向越笨重，最高加到0.95
 @export var vision_range: float = 5.0  # 视力属性，瞄准时摄像机最大偏移距离
 
 var _equipment_mgr: Node
@@ -417,7 +417,7 @@ func _physics_process(delta: float) -> void:
 	_update_animation(input_dir.length())
 
 
-const ROTATION_DAMPING: float = 3.0
+const ROTATION_DAMPING: float = 12.0 #初始转向速度
 
 func _face_mouse(delta: float) -> void:
 	var hit := get_mouse_ground_position()
@@ -425,5 +425,5 @@ func _face_mouse(delta: float) -> void:
 	if look_target.distance_squared_to(global_position) > 0.001:
 		_target_yaw = atan2(-(hit.x - global_position.x), -(hit.z - global_position.z))
 
-	var factor := ROTATION_DAMPING * reaction_speed * delta
+	var factor: float = ROTATION_DAMPING * maxf(0.05, 1.0 - rotation_lag) * delta
 	rotation.y = lerp_angle(rotation.y, _target_yaw, minf(factor, 1.0))

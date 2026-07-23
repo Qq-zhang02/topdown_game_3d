@@ -153,10 +153,16 @@ func _slot_to_index(slot: int) -> int:
 # 内部：应用装备属性到光源
 # ═══════════════════════════════════════════
 
+func _set_player_lag(lag: float) -> void:
+	var player := get_parent()
+	if player and "rotation_lag" in player:
+		player.rotation_lag = lag
+
 func _apply_current() -> void:
 	var eq := get_current()
 	if eq == null:
 		_turn_off_all()
+		_set_player_lag(0.0)
 		equipment_changed.emit("")
 		equipment_cycled.emit(_current_index, "")
 		return
@@ -166,10 +172,15 @@ func _apply_current() -> void:
 	# 非光源装备（武器等）没有 light_type 属性，get 返回 null → 只关灯
 	var light_type = eq.get("light_type")
 	if light_type == null:
+		var lag: float = eq.get("rotation_lag") if "rotation_lag" in eq else 0.0
+		_set_player_lag(lag)
 		var name_str: String = eq.get("display_name")
 		equipment_changed.emit(name_str)
 		equipment_cycled.emit(_current_index, name_str)
 		return
+
+	# 光源装备 → 重置迟滞
+	_set_player_lag(0.0)
 
 	var LIGHT_SPOT: int = EquipmentScript.LightType.SPOT
 	var LIGHT_OMNI: int = EquipmentScript.LightType.OMNI

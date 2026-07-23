@@ -164,22 +164,53 @@ world_3d._ready()
 
 角色朝向改用 `lerp_angle` 平滑插值，不再瞬时 `look_at`。
 
-**新增变量**：
-- `@export var reaction_speed: float = 1.0` — 反应速度，越高转向越灵敏
+- `@export var rotation_lag: float = 0.0` — 转向迟滞，越高越笨重
 - `var _target_yaw: float = 0.0` — 目标水平朝向角
+- `const ROTATION_DAMPING: float` — 基础旋转速度系数
+- 公式：`factor = ROTATION_DAMPING × max(0.05, 1.0 - rotation_lag) × delta`
+- 装备的武器可携带 `rotation_lag` 加成，切换时由 `EquipmentManager`（`_set_player_lag`）自动应用到玩家
 
-**旋转逻辑**（`_face_mouse(delta)`）：
-```gdscript
-const ROTATION_DAMPING: float = 3.0
-var factor := ROTATION_DAMPING * reaction_speed * delta
-rotation.y = lerp_angle(rotation.y, _target_yaw, minf(factor, 1.0))
+### 武器属性加减模式
+
+**文件：** `scripts/items/weapon_data.gd` / `scripts/combat/melee_controller.gd`
+
+装备武器不再替换拳头属性，改为**加法叠加**：
+
+```
+最终属性 = 拳头基础值 + 武器加成值
 ```
 
-**效果参考**（reaction_speed 值 vs 旋转 180° 耗时）：
-- 0.5 → ~0.67s（沉重）
-- 1.0 → ~0.33s（默认，轻快有惯性）
-- 3.0 → ~0.11s（灵敏）
-- 5.0+ → 接近瞬时
+`melee_controller.gd` 的 `_do_attack()` 使用 `fist_XXX + weapon.XXX` 计算。武器 `.tres` 文件中定义的属性均为**加成值**（可为正负），不设则默认为 0（无加成）。
+
+可加成属性：`damage`、`attack_range`、`attack_arc`、`cooldown`、`knockback`、`rotation_lag`、`has_projectile_vfx`
+
+**示例**——木剑（`data/items/weapons/sword_wood.tres`）：
+- 加成值填在 .tres 中，拳头基础值在 `melee_controller.gd` 顶部定义
+- 武器伤害最终 = 拳头伤害 + 武器加成
+
+### 武器攻击视觉特效
+
+**文件：** `scripts/combat/melee_controller.gd` / `scripts/vfx/thrust_beam_vfx.gd` / `shaders/thrust_beam.gdshader`
+
+装备武器时可通过 `has_projectile_vfx = true` 开启攻击特效。当前支持**突刺光束**（ThrustBeam）：
+
+- 模型：`models/vfx/ThrustBeam.glb`（锥形能量柱，1m 长，+Y 方向建模）
+- 着色器：`shaders/thrust_beam.gdshader` — 从柄向尖端生长 + 噪声能量流动 + Fresnel 边缘淡出
+- 控制脚本：`scripts/vfx/thrust_beam_vfx.gd`
+
+**时序（固定，不可调）：**
+| 时间 | 事件 |
+|------|------|
+| 0.0s | 点击攻击，VFX 计时开始 |
+| 0.1s | 光束从柄向尖端展开（progress 0→1） |
+| 0.14s | 侧向溅射粒子 + 尖端爆开粒子 |
+| 0.2s | 全部特效结束，自动清理 |
+
+粒子效果：
+- `SideSplash` — 沿光束柱身的盒形区域持续发射，粒子沿径向溅射
+- `ImpactBurst` — 尖端处球形区域一次爆开，白→蓝色消散
+
+攻击伤害（近战扇形判定）与 VFX 互相独立，伤害命中时机由 `hit_delay` 控制。
 
 ### 受击反馈（health.gd 自动系统）
 
@@ -231,11 +262,9 @@ ParticleProcessMaterial:
 5. `ps.position = from_attacker_direction.normalized() × radius`
 
 **实体偏移系数**（`particle_offset_scale`，默认 1.0）：
-- 树 → `0.3`（`resource_node.gd:32`，树冠大但希望粒子集中在树干附近）
-- 石头 → 默认 `1.0`（`resource_node.gd:38`）
-- 动物 → 默认 `1.0`（`animal_spawner.gd:128` / `world_3d.gd:449`）
-- 玩家 → 默认 `1.0`
 - 通过 `Health.set_particle_offset_scale(float)` 设置
+- 树设为 `0.3`（`resource_node.gd`，树冠大但希望粒子集中在树干附近）
+- 石头/动物/玩家均为默认 `1.0`
 
 #### ⚠️ 粒子颜色踩坑记录（供后续 agent 参考）
 

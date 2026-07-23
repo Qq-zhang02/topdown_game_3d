@@ -1,16 +1,18 @@
-[gd_resource type="Resource" script_class="WeaponData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="WeaponData" format=3 uid="uid://bs8h7wnogg4q5"]
 
-[ext_resource type="Script" path="res://scripts/items/weapon_data.gd" id="1"]
+[ext_resource type="Script" uid="uid://cq321eon6o2t5" path="res://scripts/items/weapon_data.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+damage = 5.0
+attack_range = 1.4
+attack_arc = 20.0
+cooldown = 0.6
+knockback = 1.5
+rotation_lag = 0.7
+has_projectile_vfx = true
 id = "sword_wood"
 display_name = "木剑"
 description = "简易的木制剑，聊胜于无"
 max_stack = 1
 ui_color = Color(0.72, 0.55, 0.3, 1)
-damage = 15.0
-attack_range = 2.4
-attack_arc = 100.0
-cooldown = 0.5
-knockback = 3.5
