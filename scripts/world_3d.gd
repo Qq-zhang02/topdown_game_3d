@@ -446,6 +446,7 @@ func _spawn_single_animal() -> void:
 	health.set_script(HealthScript)
 	health.name = "Health"
 	health.set("max_hp", 30.0)
+	health.set_particle_color(Color(0.75, 0.3, 0.3))
 	body.add_child(health)
 
 	var ItemDBScript := load("res://scripts/core/item_db.gd")
@@ -807,7 +808,6 @@ func _on_hp_changed(amount: float, from: Vector3) -> void:
 	_update_hp_bar()
 	if amount > 0.0:
 		_show_damage_flash()
-		_tint_player_red()
 		_knockback_player(from)
 
 

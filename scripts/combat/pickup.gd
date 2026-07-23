@@ -6,6 +6,11 @@ class_name Pickup
 var item: Resource
 var count: int = 1
 
+var _can_pickup: bool = false
+var _flying_to: Node3D = null
+var _fly_speed: float = 6.0
+var _area: Area3D
+
 var _base_y: float = 0.0
 var _t: float = 0.0
 var _mesh: MeshInstance3D
@@ -19,7 +24,7 @@ static func spawn(parent: Node, item_res: Resource, amount: int, pos: Vector3) -
 	var p := Pickup.new()
 	p.item = item_res
 	p.count = amount
-	p.position = pos + Vector3(randf_range(-0.4, 0.4), 0.5, randf_range(-0.4, 0.4))
+	p.position = pos + Vector3(randf_range(-0.3, 0.3), 2.0, randf_range(-0.3, 0.3))
 	parent.add_child(p)
 	p._build()
 
@@ -58,8 +63,20 @@ func _build() -> void:
 	area.add_child(col)
 	add_child(area)
 	area.body_entered.connect(_on_body_entered)
+	_area = area
 
 	_base_y = position.y
+
+	# 掉落动画：先禁用拾取，落地弹跳+滑行后才可拾取
+	area.monitoring = false
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(self, "position:y", 0.2, 0.6).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+	var slide_x := randf_range(-0.8, 0.8)
+	var slide_z := randf_range(-0.8, 0.8)
+	tween.tween_property(self, "position:x", position.x + slide_x, 0.6).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(self, "position:z", position.z + slide_z, 0.6).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.finished.connect(_on_drop_finished)
 
 
 func _update_label() -> void:
@@ -67,30 +84,62 @@ func _update_label() -> void:
 
 
 func _process(delta: float) -> void:
-	_t += delta
+	# 拾取飞行阶段：飞向玩家，缩小，加速旋转
+	if _flying_to != null:
+		var target := _flying_to.global_position
+		target.y = global_position.y
+		var dist := global_position.distance_to(target)
+		global_position = global_position.move_toward(target, _fly_speed * delta)
+		_mesh.rotation.y += delta * 6.0
+		scale = Vector3.ONE * clamp(dist / 1.5, 0.05, 1.0)
+		if dist < 0.3:
+			_do_pickup(_flying_to)
+		return
+
+	# 掉落动画期间只旋转，不做浮动
 	_mesh.rotation.y += delta * 2.0
+	if not _can_pickup:
+		return
+
+	# 可拾取状态：正常浮动
+	_t += delta
 	position.y = _base_y + sin(_t * 2.5) * 0.12
+
+
+func _on_drop_finished() -> void:
+	_base_y = position.y
+	_can_pickup = true
+	_area.monitoring = true
 
 
 func _on_body_entered(body: Node3D) -> void:
 	if not body.is_in_group("player"):
 		return
+	if not _can_pickup or _flying_to != null:
+		return
 
-	# 装备/武器 → 装备管理器；材料 → 背包
+	var type: int = item.get("item_type")
+
+	# 材料先尝试放入背包，放不下就不飞了
+	if type == 0:
+		var inv: Node = body.get_node_or_null("Inventory")
+		if inv == null:
+			return
+		var leftover: int = inv.add_item(item, count)
+		if leftover > 0:
+			count = leftover
+			_update_label()
+			return  # 背包满，留在原地
+
+	# 开始飞向玩家
+	_flying_to = body
+	_area.monitoring = false
+
+
+func _do_pickup(body: Node3D) -> void:
 	var type: int = item.get("item_type")
 	if type == 1 or type == 2:  # EQUIPMENT / WEAPON
 		var mgr: Node = body.get_node_or_null("EquipmentManager")
 		if mgr and mgr.has_method("add_equipment"):
 			mgr.add_equipment(item.duplicate())
-			queue_free()
-		return
-
-	var inv: Node = body.get_node_or_null("Inventory")
-	if inv == null:
-		return
-	var leftover: int = inv.add_item(item, count)
-	if leftover <= 0:
-		queue_free()
-	else:
-		count = leftover
-		_update_label()
+	queue_free()

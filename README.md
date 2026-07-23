@@ -1,6 +1,6 @@
 # TopDownGame3D v3.3
 
-> Godot 4.7.1 · 俯视角 3D · 全 GDScript · 2026-07-23
+> Godot 4.7.1 · 俯视角 3D · 全 GDScript · 2026-07-29
 
 ---
 
@@ -10,7 +10,7 @@
 F:/godot_stuff/projects/topdown_game_3d-v3/
 ```
 
-GitHub (公开)：`https://github.com/Qq-zhang02/topdown_game_3d`
+GitHub (私密)：`https://github.com/Qq-zhang02/topdown_game_3d`
 
 ---
 
@@ -38,9 +38,9 @@ topdown_game_3d-v3/
 │   │   ├── inventory_ui.gd    # 背包界面：8x4，Tab 开关，拖拽整理
 │   │   └── inventory_slot.gd  # 背包格子（拖拽逻辑）
 │   ├── combat/
-│   │   ├── health.gd          # 通用血量组件（玩家/动物/资源节点共用）
+│   │   ├── health.gd          # 通用血量组件（受击红闪+溅射粒子，自动覆盖所有挂载者）
 │   │   ├── melee_controller.gd# 近战：左键扇形判定，伤害取自当前 WeaponData
-│   │   └── pickup.gd          # 掉落物：走近自动拾取（材料→背包，装备→装备管理器）
+│   │   └── pickup.gd          # 掉落物：上抛弹跳→滑行→可拾取，触发后飞向角色消失
 │   ├── building/
 │   │   ├── building_data.gd   # 建筑定义：尺寸/颜色/材料消耗/发光
 │   │   ├── build_controller.gd# 建造模式：幽灵预览(绿/红)+网格吸附+R旋转
@@ -52,7 +52,7 @@ topdown_game_3d-v3/
 │   ├── items/
 │   │   └── weapon_data.gd     # 近战武器数据（继承 ItemData）
 │   ├── world_3d.gd            # 世界总管（占地登记/建造放置/各系统组装）
-│   ├── player_3d.gd           # 玩家：移动/朝向/装备/血量/背包/近战/动画
+│   ├── player_3d.gd           # 玩家：移动/朝向(反应速度阻尼)/装备/血量/背包/近战/动画
 │   ├── equipment.gd           # 光源装备（继承 ItemData：手电筒/火把）
 │   ├── equipment_manager.gd   # 装备管理器（F 切换，武器也走这里）
 │   ├── equipment_hud.gd       # 底部装备栏
@@ -113,6 +113,8 @@ world_3d._ready()
 - **新建筑** → `data/buildings/` 加 .tres（BuildingData：尺寸/颜色/成本/发光），建造菜单自动出现
 - **新的可攻击对象** → 挂 `health.gd`（命名 "Health"）+ 加入 `"damageable"` 组，近战即可命中
 - **新光源装备** → 代码里 new Equipment（参考 player_3d.gd `_make_torch`）
+- **新掉落物** → `Pickup.spawn(parent, item_res, amount, pos)` 自动处理掉落动画 + 拾取飞行，按 `item_type` 分流到背包或装备管理器
+- **受击反馈** → 任何挂载 `health.gd` 的实体自动获得：模型闪红 0.3s + 彩色溅射粒子。粒子颜色通过 `set_particle_color()` 设置，默认白色
 
 **信号解耦：** `health.died` / `inventory.changed` / `build_menu.recipe_selected`，系统间不直接引用。
 
@@ -123,9 +125,149 @@ world_3d._ready()
 
 ## 6. 玩法循环
 
-砍树/砸石头（近战）→ 掉木材/石头 → 自动拾取进背包 → B 打开建造 →
+砍树/砸石头（近战）→ 掉木材/石头（上抛弹跳→落地滑行→可拾取）→ 走进自动飞向角色 → B 打开建造 →
 消耗材料放篝火(发光)/木墙(阻挡)/木地基(平台)。
 杀动物 → 掉生肉（右键使用回血 15HP）。走进海里 → 持续掉血 → 死亡 → 回存档选择界面。
+
+### 掉落 / 拾取动画
+
+**文件：** `scripts/combat/pickup.gd`（`class_name Pickup`，继承 Node3D）
+
+所有掉落物通过 `Pickup.spawn(parent, item_res, amount, pos)` 静态方法创建，自动执行完整动画流程。
+
+**掉落动画**（spawn → 可拾取）：
+- 初始 Y=2.0（上抛），XZ 偏移 ±0.3
+- Tween 平行执行（0.6s）：
+  - Y: 2.0 → 0.2，`TRANS_BOUNCE` `EASE_OUT`（弹跳落地）
+  - XZ: 滑移 ±0.8，`TRANS_QUAD` `EASE_OUT`
+- 动画期间 Area3D 碰撞关闭，`_can_pickup = false`
+- 动画完成 → `_on_drop_finished()` 更新 `_base_y`，开启拾取
+- 掉落动画期间 mesh 持续旋转，不做浮动
+
+**拾取动画**（触发 → 消失）：
+- Area3D 半径 1.1m，`body_entered` 检测玩家
+- 材料类型：先 `Inventory.add_item()`，放不下则原地保留（不触发飞行）
+- 装备/武器：直接触发飞行
+- `_fly_to = body`，`_area.monitoring = false`（防重复触发）
+- `_process` 飞行分支：`move_toward` 追玩家实时位置，mesh 加速旋转（×3），scale 随距离缩小（`max(dist/1.5, 0.05)`）
+- 距离 < 0.3 → `_do_pickup()` 执行最终拾取 → `queue_free()`
+
+**关键变量**（`scripts/combat/pickup.gd`）：
+- `_can_pickup: bool` — 掉落动画完成后变为 true
+- `_flying_to: Node3D` — 正在飞向的目标（玩家），非 null 时进入飞行分支
+- `_fly_speed: float = 6.0` — 飞行速度
+- `_area: Area3D` — 拾取碰撞区域，飞行时禁用
+
+### 旋转阻尼
+
+**文件：** `scripts/player_3d.gd`
+
+角色朝向改用 `lerp_angle` 平滑插值，不再瞬时 `look_at`。
+
+**新增变量**：
+- `@export var reaction_speed: float = 1.0` — 反应速度，越高转向越灵敏
+- `var _target_yaw: float = 0.0` — 目标水平朝向角
+
+**旋转逻辑**（`_face_mouse(delta)`）：
+```gdscript
+const ROTATION_DAMPING: float = 3.0
+var factor := ROTATION_DAMPING * reaction_speed * delta
+rotation.y = lerp_angle(rotation.y, _target_yaw, minf(factor, 1.0))
+```
+
+**效果参考**（reaction_speed 值 vs 旋转 180° 耗时）：
+- 0.5 → ~0.67s（沉重）
+- 1.0 → ~0.33s（默认，轻快有惯性）
+- 3.0 → ~0.11s（灵敏）
+- 5.0+ → 接近瞬时
+
+### 受击反馈（health.gd 自动系统）
+
+**文件：** `scripts/combat/health.gd`（`class_name Health`，继承 Node）
+
+受击反馈完全由 `Health.take_damage()` 自动触发，不依赖外部信号连接。所有挂载 Health 的实体（玩家、动物、资源节点）自动获得以下两种反馈：
+
+#### 1. 模型红色闪烁
+
+在 `take_damage()` 中调用 `_tint_parent_red()`：
+- 遍历 `get_parent().find_children("*", "MeshInstance3D", true, false)`
+- 对每张材质 `duplicate()`，设 `albedo_color = RED`，通过 `set_surface_override_material()` 应用
+- 创建 Tween，0.3s 内渐回原色
+- 资源节点同样生效（代码创建的 StandardMaterial3D 材质）
+
+#### 2. 溅射粒子系统
+
+在 `take_damage()` 中调用 `_spawn_hit_particles(from_position)`。
+
+**粒子参数：**
+```
+draw_pass_1: SphereMesh(radius=0.15, height=0.3)
+材质: StandardMaterial3D
+  - transparency = TRANSPARENCY_ALPHA
+  - shading_mode = SHADING_MODE_UNSHADED
+  - vertex_color_use_as_albedo = true  ← 关键：让粒子颜色生效
+  - blend_mode = BLEND_MODE_ADD        ← 加色混合，重叠变亮产生发光
+  - albedo_color = WHITE
+  - emission = WHITE, energy = 8.0
+ParticleProcessMaterial:
+  - amount = 20, lifetime = 0.3
+  - spread = 180°, gravity = (0, -6, 0)
+  - initial_velocity = 2~6
+  - scale = 0.2~0.4
+  - alpha_curve: 0.0→0.3, 0.2→0.3, 1.0→0.0  (初始低透明，渐隐)
+```
+
+**粒子颜色** — 通过 `Health.set_particle_color(Color)` 在每个实体的创建位置预设：
+- 树（`resource_node.gd:108`）→ `Color(0.40, 0.26, 0.13)` 树干棕
+- 石头（`resource_node.gd:108`）→ `Color(0.45, 0.45, 0.48)` 灰色
+- 动物（`animal_spawner.gd:128` / `world_3d.gd:449`）→ `Color(0.75, 0.3, 0.3)` 生肉红
+- 玩家 → 未设，默认 `Color.WHITE`
+
+**表面偏移** — 粒子从受击方向的表面发出：
+1. 遍历父节点下所有 MeshInstance3D 的 AABB，取 4 个底角
+2. 转换到父节点局部空间，计算最大 XZ 距离作为半径
+3. `radius = max(radius, 0.3)` 保底，`radius *= 0.6` 缩进系数
+4. `ps.position = from_attacker_direction.normalized() × radius`
+
+#### ⚠️ 粒子颜色踩坑记录（供后续 agent 参考）
+
+粒子颜色和发光在实现过程中踩了几个坑，记录如下：
+
+**坑 1：`@export var` 通过 `set()` 赋值可能不生效**
+- 最初用 `@export var particle_color: Color = Color.WHITE` + `health.set("particle_color", Color(...))`
+- 在 `add_child` 之前调用 `set()`，属性有时无法正确写入
+- 改为普通 `var particle_color` + `func set_particle_color(c: Color)` 方法调用，问题解决
+- `max_hp` 也用 `set()` 但能正常工作，因为 `_ready()` 中会读取它
+
+**坑 2：`draw_pass` 材质默认忽略粒子颜色（根因）**
+- 使用 `draw_pass_1 = SphereMesh` 时，mesh 的 `StandardMaterial3D` 默认用固定 `albedo_color`
+- `ParticleProcessMaterial.color` 传入的粒子颜色不会自动应用到 mesh 上
+- 必须在 mesh 材质上设置 `vertex_color_use_as_albedo = true`，粒子颜色才生效
+- 在此之前所有粒子始终显示白色（材质固定白），无论 `particle_color` 设成什么
+
+**坑 3：发光需要 `BLEND_MODE_ADD` 加色混合**
+- 光靠 `emission_enabled + emission_energy_multiplier` 不足以让粒子有可见发光
+- 必须同时设置 `blend_mode = BLEND_MODE_ADD`，重叠粒子会变亮，产生发光效果
+- 加色混合模式下透明度由 alpha 值控制 ADD 强度
+
+**坑 4：`GPUParticles3D` 无 `draw_pass` 可能不渲染**
+- 不设 `draw_pass` 时使用默认点精灵渲染，但在某些 Godot 版本/配置下可能完全不可见
+- 设置 `draw_pass_1` 并使用显式 mesh 是最稳妥的方式
+
+**坑 5：透明度需要材质配合**
+- `alpha_curve` 需要 `CurveTexture`（不是直接 `Curve`）
+- 材质必须设置 `transparency = TRANSPARENCY_ALPHA`，否则 alpha 被忽略
+- 透明 + 加色混合可以同时存在，alpha 控制加色强度
+
+**坑 6：`visibility_aabb` 必须设置**
+- GPUParticles3D 默认 `visibility_aabb` 为空，粒子被视锥裁剪，完全不可见
+- 必须手动设一个足够大的 AABB：`AABB(Vector3(-4, -4, -4), Vector3(8, 8, 8))`
+
+**相关文件：**
+- `scripts/combat/health.gd` — 粒子生成和颜色管理
+- `scripts/world/resource_node.gd:108` — 树/石头颜色预设
+- `scripts/animal_spawner.gd:128` — 动物颜色预设
+- `scripts/world_3d.gd:449` — 动物重生颜色预设
 
 ---
 
@@ -146,8 +288,9 @@ world_3d._ready()
 
 ### 受伤反馈
 
-- 屏幕红色闪烁（0.3 秒淡出）
-- 角色模型材质变红（0.3 秒恢复）
+- 屏幕红色闪烁（0.3 秒淡出，仅玩家）
+- **模型材质变红 0.3s**（health.gd 自动处理，玩家/动物/资源节点全覆盖）
+- **溅射粒子**（health.gd 自动处理，圆形发光小球 + 透明度衰减）
 - 击退冲量：apply_knockback + lerp 衰减（~0.5秒），纯水平推开不干扰跳跃
 
 ### 物品使用

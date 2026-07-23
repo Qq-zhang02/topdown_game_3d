@@ -13,6 +13,7 @@ var _skin_path: String = "res://models/character/colormap.png"
 @export var speed: float = 5.0
 @export var jump_velocity: float = 15.0
 @export var gravity: float = 35.0
+@export var reaction_speed: float = 1.0  # 反应速度，越高转向越灵敏
 @export var vision_range: float = 5.0  # 视力属性，瞄准时摄像机最大偏移距离
 
 var _equipment_mgr: Node
@@ -26,6 +27,7 @@ var _inventory: Node
 var _dead: bool = false
 var _attacking: bool = false
 var _knockback: Vector3 = Vector3.ZERO
+var _target_yaw: float = 0.0
 
 
 func set_model_path(path: String) -> void:
@@ -411,12 +413,17 @@ func _physics_process(delta: float) -> void:
 
 	move_and_slide()
 
-	_face_mouse()
+	_face_mouse(delta)
 	_update_animation(input_dir.length())
 
 
-func _face_mouse() -> void:
+const ROTATION_DAMPING: float = 3.0
+
+func _face_mouse(delta: float) -> void:
 	var hit := get_mouse_ground_position()
 	var look_target := Vector3(hit.x, global_position.y, hit.z)
 	if look_target.distance_squared_to(global_position) > 0.001:
-		look_at(look_target, Vector3.UP)
+		_target_yaw = atan2(-(hit.x - global_position.x), -(hit.z - global_position.z))
+
+	var factor := ROTATION_DAMPING * reaction_speed * delta
+	rotation.y = lerp_angle(rotation.y, _target_yaw, minf(factor, 1.0))

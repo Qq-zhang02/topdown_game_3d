@@ -124,6 +124,7 @@ func _spawn_animal(model_name: String, pos: Vector3, scale_val: float, rot_y: fl
 	health.set_script(HealthScript)
 	health.name = "Health"
 	health.set("max_hp", 30.0)
+	health.set_particle_color(Color(0.75, 0.3, 0.3))
 	body.add_child(health)
 	health.died.connect(_on_animal_died.bind(body))
 
