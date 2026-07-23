@@ -29,7 +29,7 @@ static func spawn(parent: Node, kind: String, pos: Vector3) -> ResourceNode:
 			node.drop_min = 2
 			node.drop_max = 4
 			node._build_tree()
-			node._add_health(40.0, Color(0.40, 0.26, 0.13))
+			node._add_health(40.0, Color(0.40, 0.26, 0.13), 0.3)
 		"rock":
 			node.drop_id = "stone"
 			node.drop_min = 2
@@ -100,12 +100,13 @@ func _build_rock() -> void:
 	occupied_aabb = AABB(global_position + Vector3(-0.8, 0, -0.8), Vector3(1.6, 1.2, 1.6))
 
 
-func _add_health(hp: float, pc: Color = Color.WHITE) -> void:
+func _add_health(hp: float, pc: Color = Color.WHITE, offset_s: float = 1.0) -> void:
 	var health := Node.new()
 	health.set_script(HealthClass)
 	health.name = "Health"
 	health.set("max_hp", hp)
 	health.set_particle_color(pc)
+	health.set_particle_offset_scale(offset_s)
 	add_child(health)
 	health.died.connect(_on_died)
 

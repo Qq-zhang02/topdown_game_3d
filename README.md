@@ -208,13 +208,13 @@ draw_pass_1: SphereMesh(radius=0.15, height=0.3)
   - vertex_color_use_as_albedo = true  ← 关键：让粒子颜色生效
   - blend_mode = BLEND_MODE_ADD        ← 加色混合，重叠变亮产生发光
   - albedo_color = WHITE
-  - emission = WHITE, energy = 8.0
+  - emission = WHITE, energy = 12.0
 ParticleProcessMaterial:
-  - amount = 20, lifetime = 0.3
+  - amount = 20, lifetime = 0.15
   - spread = 180°, gravity = (0, -6, 0)
   - initial_velocity = 2~6
   - scale = 0.2~0.4
-  - alpha_curve: 0.0→0.3, 0.2→0.3, 1.0→0.0  (初始低透明，渐隐)
+  - alpha_curve: 0.0→0.5, 0.2→0.5, 1.0→0.0  (初始低透0.5，前0.2生命周期保持0.5透明，到死亡时逐渐透明降到0)
 ```
 
 **粒子颜色** — 通过 `Health.set_particle_color(Color)` 在每个实体的创建位置预设：
@@ -226,8 +226,16 @@ ParticleProcessMaterial:
 **表面偏移** — 粒子从受击方向的表面发出：
 1. 遍历父节点下所有 MeshInstance3D 的 AABB，取 4 个底角
 2. 转换到父节点局部空间，计算最大 XZ 距离作为半径
-3. `radius = max(radius, 0.3)` 保底，`radius *= 0.6` 缩进系数
-4. `ps.position = from_attacker_direction.normalized() × radius`
+3. `radius = max(radius, 0.3)` 保底
+4. `radius *= 0.6 × particle_offset_scale`（两层系数：全局 0.6 + 实体自身系数）
+5. `ps.position = from_attacker_direction.normalized() × radius`
+
+**实体偏移系数**（`particle_offset_scale`，默认 1.0）：
+- 树 → `0.3`（`resource_node.gd:32`，树冠大但希望粒子集中在树干附近）
+- 石头 → 默认 `1.0`（`resource_node.gd:38`）
+- 动物 → 默认 `1.0`（`animal_spawner.gd:128` / `world_3d.gd:449`）
+- 玩家 → 默认 `1.0`
+- 通过 `Health.set_particle_offset_scale(float)` 设置
 
 #### ⚠️ 粒子颜色踩坑记录（供后续 agent 参考）
 

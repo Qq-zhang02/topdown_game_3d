@@ -7,7 +7,7 @@ script = ExtResource("1")
 id = "foundation"
 display_name = "木地基"
 description = "一块平稳的木制平台"
-size = Vector3(3, 0.2, 3)
+size = Vector3(3, 1.5, 3)
 color = Color(0.6, 0.45, 0.25, 1)
 cost = {
 "wood": 6

@@ -10,6 +10,7 @@ signal died
 
 var hp: float
 var particle_color: Color = Color.WHITE  # 受击溅射粒子颜色
+var particle_offset_scale: float = 1.0  # 粒子偏移系数（树=0.3，其他默认1.0）
 
 
 func _ready() -> void:
@@ -40,6 +41,10 @@ func is_dead() -> bool:
 
 func set_particle_color(c: Color) -> void:
 	particle_color = c
+
+
+func set_particle_offset_scale(s: float) -> void:
+	particle_offset_scale = s
 
 
 func _tint_parent_red() -> void:
@@ -92,7 +97,7 @@ func _spawn_hit_particles(from_position: Vector3 = Vector3.ZERO) -> void:
 			var d := Vector2(p.x, p.z).length()
 			if d > radius:
 				radius = d
-	radius *= 0.6  #粒子偏移距离系数
+	radius *= 0.6 * particle_offset_scale  #粒子偏移距离系数,不同物体的偏移系数不一样
 
 	# 从受击方向的表面发出
 	if from_position != Vector3.ZERO:
@@ -104,7 +109,7 @@ func _spawn_hit_particles(from_position: Vector3 = Vector3.ZERO) -> void:
 	ps.one_shot = true
 	ps.emitting = false
 	ps.amount = 20
-	ps.lifetime = 0.3
+	ps.lifetime = 0.15
 	ps.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	ps.visibility_aabb = AABB(Vector3(-4, -4, -4), Vector3(8, 8, 8))
 
@@ -120,7 +125,7 @@ func _spawn_hit_particles(from_position: Vector3 = Vector3.ZERO) -> void:
 	sphere_mat.albedo_color = Color.WHITE
 	sphere_mat.emission_enabled = true
 	sphere_mat.emission = Color.WHITE
-	sphere_mat.emission_energy_multiplier = 8.0 #发光强度
+	sphere_mat.emission_energy_multiplier = 12.0 #发光强度
 	sphere.material = sphere_mat
 	ps.draw_pass_1 = sphere
 
@@ -137,9 +142,9 @@ func _spawn_hit_particles(from_position: Vector3 = Vector3.ZERO) -> void:
 	# 透明度随生命周期衰减
 	var curve_tex := CurveTexture.new()
 	var curve := Curve.new()
-	curve.add_point(Vector2(0.0, 0.3))
-	curve.add_point(Vector2(0.2, 0.3))
-	curve.add_point(Vector2(1.0, 0.0))
+	curve.add_point(Vector2(0.0, 0.5)) #粒子出生时透明度 0.5
+	curve.add_point(Vector2(0.2, 0.5)) #前 20% 的生命周期保持 0.5 不变
+	curve.add_point(Vector2(1.0, 0.0)) #从 20% 到死亡，线性渐隐到完全透明
 	curve_tex.curve = curve
 	pm.alpha_curve = curve_tex
 	ps.process_material = pm
