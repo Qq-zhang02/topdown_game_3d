@@ -1,0 +1,54 @@
+# 突刺光束模型要求（Blender → Godot）
+
+## 基本信息
+
+- 用途：武器攻击特效（突刺光束）
+- 引擎：Godot 4.7.1
+- 导出格式：glTF 2.0 (.glb)
+- 当前模型路径：`res://models/vfx/ThrustBeam.glb`
+
+## 建模要求
+
+### 形状（不限）
+- **任何形状都可以**：扁平光刃、圆柱、弧形弯刀、十字形等
+- 沿 **+Y** 方向建造（根部在原点，尖端在 +Y）
+- 长度：**1 米**（方便 Godot 里按需缩放）
+
+### UV 要求（关键！）
+
+UV 直接影响 Godot Shader 的显示效果，必须按以下规则：
+
+- **V 方向 = 从根部到尖端**：根部 V=0，尖端 V=1
+- **U 方向 = 绕柱一圈**：U=0~1 环绕柱身
+- UV 必须正确导出到 glTF（导出时确保勾选 UV）
+
+### 封口
+- 尖端需要封口（一个顶点汇聚所有尖端顶点）
+- 根部不需要严格封口（根部会被角色遮挡/透明处理）
+
+## 材质（Blender 预览用即可）
+
+Blender 中随便给个自发光材质预览就行，Godot 会用自己的 ShaderMaterial 覆盖。
+
+## 导出设置
+
+Blender 导出 glTF 2.0 时：
+- 勾选 `UVs`
+- 勾选 `Export Selected`（仅导出模型）
+- 材质：可选导出，反正 Godot 会覆盖
+- 其他默认即可
+
+## Godot 中如何使用
+
+模型文件放到 `res://models/vfx/` 目录下，然后在 `scripts/vfx/thrust_beam_vfx.gd` 第 5 行替换模型路径：
+
+```gdscript
+const THRUST_MODEL := preload("res://models/vfx/你的模型.glb")
+```
+
+如果模型长度不是 1 米，还需要调整粒子位置（同文件第 99 行和第 128 行）：
+
+```gdscript
+SideSplash.position = Vector3(0, 0, -长度_米 × 0.5)
+ImpactBurst.position = Vector3(0, 0, -长度_米)
+```
