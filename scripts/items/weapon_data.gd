@@ -5,7 +5,7 @@ class_name WeaponData
 
 @export var damage: float = 0.0          # 伤害加成
 @export var attack_range: float = 0.0    # 攻击距离加成（米）
-@export var attack_arc: float = 0.0      # 扇形角度加成（度）
+@export var attack_arc: float = 0.0      # 左右半宽加成（米）
 @export var cooldown: float = 0.0        # 冷却时间加成（秒，负值=更快）
 @export var knockback: float = 0.0       # 击退冲量加成
 @export var rotation_lag: float = 0.0    # 转向迟滞

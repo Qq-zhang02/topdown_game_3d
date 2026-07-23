@@ -1,7 +1,7 @@
 shader_type spatial;
 render_mode unshaded, cull_disabled, blend_add, depth_draw_always;
 
-uniform vec4 beam_color : source_color = vec4(0.3, 0.75, 1.0, 1.0);
+uniform vec4 beam_color : source_color = vec4(0.55, 0.35, 0.15, 1.0);
 uniform float progress : hint_range(0.0, 1.0) = 0.0;
 uniform float edge_softness : hint_range(0.0, 0.5) = 0.08;
 uniform float edge_fade : hint_range(0.0, 1.0) = 0.6;
@@ -32,7 +32,7 @@ void fragment() {
 	// 前缘生长
 	float lead = 1.0 - smoothstep(progress - edge_softness, progress, v);
 	// 根部淡入
-	float tail = smoothstep(0.0, 0.1, v);
+	float tail = mix(1.0, 0.3, smoothstep(0.0, 0.5, v));
 
 	// 沿柱身流动的能量噪声
 	float n = value_noise(vec2(UV.x * noise_scale * 0.5, v * noise_scale)

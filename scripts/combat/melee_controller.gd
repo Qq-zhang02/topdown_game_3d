@@ -1,16 +1,16 @@
 extends Node
 class_name MeleeController
-## 近战攻击：左键挥击，扇形范围判定，命中 "damageable" 组内目标
+## 近战攻击：左键挥击，矩形范围判定，命中 "damageable" 组内目标
 ## 伤害参数取自当前装备的 WeaponData，未持武器时用拳头
 
 const WeaponDataClass := preload("res://scripts/items/weapon_data.gd")
 
 @export var fist_damage: float = 5.0
-@export var fist_range: float = 1
-@export var fist_arc: float = 40.0 #攻击扇形范围°
+@export var fist_range: float = 1          # 前方攻击距离（米）
+@export var fist_arc: float = 0.3            # 左右半宽（米）
 @export var fist_cooldown: float = 0.4
 @export var fist_knockback: float = 2.0
-@export var hit_delay: float = 0.18  # 挥击动作到伤害生效的延迟
+@export var hit_delay: float = 0.18
 
 var _player: CharacterBody3D
 var _equipment_mgr: Node
@@ -62,7 +62,7 @@ func _do_attack() -> void:
 	var weapon := _get_weapon()
 	var dmg: float = fist_damage + (weapon.damage if weapon else 0)
 	var rng: float = fist_range + (weapon.attack_range if weapon else 0)
-	var arc: float = fist_arc + (weapon.attack_arc if weapon else 0)
+	var half_w: float = fist_arc + (weapon.attack_arc if weapon else 0)
 	var knock: float = fist_knockback + (weapon.knockback if weapon else 0)
 	_cooldown_left = fist_cooldown + (weapon.cooldown if weapon else 0)
 
@@ -73,34 +73,31 @@ func _do_attack() -> void:
 		_spawn_thrust_vfx()
 
 	await get_tree().create_timer(hit_delay).timeout
-
 	if not is_instance_valid(_player) or _player.get("_dead"):
 		return
-	_apply_hits(dmg, rng, arc, knock)
+	_apply_hits(dmg, rng, half_w, knock)
 
 
-func _apply_hits(dmg: float, rng: float, arc_deg: float, knock: float) -> void:
-	var forward := -_player.global_transform.basis.z
-	forward.y = 0.0
-	forward = forward.normalized()
+func _apply_hits(dmg: float, rng: float, half_w: float, knock: float) -> void:
+	var tolerance: float = 0.4
 
 	for node in get_tree().get_nodes_in_group("damageable"):
 		if not is_instance_valid(node) or not (node is Node3D):
 			continue
-		var to: Vector3 = node.global_position - _player.global_position
-		to.y = 0.0
-		var dist := to.length()
-		if dist > rng + 0.4:
+		var local_pos: Vector3 = _player.to_local(node.global_position)
+		local_pos.y = 0.0
+		# 矩形判定：前方 -rng~0 内，左右 ±half_w 内
+		if local_pos.z > -tolerance or local_pos.z < -rng - tolerance:
 			continue
-		var angle := 0.0
-		if dist > 0.01:
-			angle = rad_to_deg(forward.angle_to(to / dist))
-		if angle > arc_deg * 0.5:
+		if abs(local_pos.x) > half_w + tolerance:
 			continue
 
 		var health: Node = node.get_node_or_null("Health")
 		if health and health.has_method("take_damage"):
 			health.take_damage(dmg, _player.global_position)
+		var to: Vector3 = node.global_position - _player.global_position
+		to.y = 0.0
+		var dist := to.length()
 		if node is RigidBody3D and dist > 0.01:
 			node.apply_central_impulse(to / dist * knock + Vector3.UP * knock * 0.3)
 
@@ -108,6 +105,6 @@ func _apply_hits(dmg: float, rng: float, arc_deg: float, knock: float) -> void:
 func _spawn_thrust_vfx() -> void:
 	const ThrustVfx := preload("res://scripts/vfx/thrust_beam_vfx.gd")
 	var beam := ThrustVfx.new()
-	beam.position = Vector3(0, 1.2, -0.4)
+	beam.scale = Vector3(2, 0.4, 1.7)
 	_player.add_child(beam)
 	beam.play()

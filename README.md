@@ -188,6 +188,20 @@ world_3d._ready()
 - 加成值填在 .tres 中，拳头基础值在 `melee_controller.gd` 顶部定义
 - 武器伤害最终 = 拳头伤害 + 武器加成
 
+### 攻击判定范围
+
+**类型：** 矩形（自 v3.3.4 起）
+**文件：** `scripts/combat/melee_controller.gd` — `_apply_hits()`
+
+攻击范围由两个参数定义，单位均为**米**：
+- `fist_range` — 前方攻击距离（拳头默认 1m）
+- `fist_arc` — 左右半宽（拳头默认 0.3m，总宽 0.6m）
+- 武器通过 `attack_range` / `attack_arc` 加成叠加
+
+判定方式：将目标位置转换到玩家局部空间，检查是否落在 `[-rng, 0]` × `[-half_w, half_w]` 矩形内（含 0.4m 宽容度）。
+
+`melee_controller.gd` 顶部 `@export` 变量为拳头基础值，`data/items/weapons/*.tres` 中的值为武器加成值，最终范围 = 拳头基础 + 武器加成。
+
 ### 武器攻击视觉特效
 
 **文件：** `scripts/combat/melee_controller.gd` / `scripts/vfx/thrust_beam_vfx.gd` / `shaders/thrust_beam.gdshader`

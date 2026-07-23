@@ -44,6 +44,26 @@ func _ready() -> void:
 
 	_setup_side_splash()
 	_setup_impact_burst()
+
+	# 尝试附着到角色左手/左臂骨骼 + 偏移微调，找不到则用硬编码
+	var parent := get_parent()
+	var found_hand := false
+	if parent:
+		var skel_nodes := parent.find_children("*", "Skeleton3D", true, false)
+		if not skel_nodes.is_empty():
+			var skel := skel_nodes[0] as Skeleton3D
+			if skel:
+				for bone_idx in range(skel.get_bone_count()):
+					var bone_name: String = skel.get_bone_name(bone_idx).to_lower()
+					if ("hand" in bone_name or "arm" in bone_name) and ("l" in bone_name or "left" in bone_name):
+						var pose: Transform3D = skel.get_bone_global_pose(bone_idx)
+						var bone_global: Vector3 = skel.global_transform * pose.origin
+						position = parent.to_local(bone_global) + Vector3(-0.2, -0.2, -0.3) #相对左手骨骼偏移
+						found_hand = true
+						break
+	if not found_hand:
+		position = Vector3(0, 1.2, -0.4)
+
 	visible = false
 
 
@@ -141,7 +161,6 @@ func _process(delta: float) -> void:
 
 	_t += delta
 
-	# 0.1s 后光束出现
 	if not _beam_started and _t >= 0.1:
 		_beam_started = true
 		visible = true
@@ -149,22 +168,19 @@ func _process(delta: float) -> void:
 			_mat.set_shader_parameter("progress", 0.0)
 			_mat.set_shader_parameter("intensity", 4.0)
 
-	# 0.14s 后粒子溅射（光束出现后 0.04s）
 	if not _particle_spawned and _t >= 0.14:
 		_particle_spawned = true
 		_side_splash.emitting = true
 		_impact_burst.restart()
 		_impact_burst.emitting = true
 
-	# 光束动画（从 0.1s 到 0.2s）
 	if _beam_started and _mat:
-		var beam_t := (_t - 0.1) / 0.1  # 0.1s 内从 0→1
+		var beam_t := (_t - 0.1) / 0.1
 		var p := clampf(beam_t, 0.0, 1.0)
 		_mat.set_shader_parameter("progress", p)
 		var fade := 1.0 - p
 		_mat.set_shader_parameter("intensity", 4.0 * fade)
 
-	# 0.2s 全部结束
 	if _t >= 0.2:
 		_playing = false
 		_side_splash.emitting = false
