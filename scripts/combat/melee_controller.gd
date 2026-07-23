@@ -1,13 +1,13 @@
 extends Node
 class_name MeleeController
-## 近战攻击：左键挥击，矩形范围判定，命中 "damageable" 组内目标
+## 近战攻击：左键挥击，圆柱范围判定，命中 "damageable" 组内目标
 ## 伤害参数取自当前装备的 WeaponData，未持武器时用拳头
 
 const WeaponDataClass := preload("res://scripts/items/weapon_data.gd")
 
 @export var fist_damage: float = 5.0
 @export var fist_range: float = 1          # 前方攻击距离（米）
-@export var fist_arc: float = 0.3            # 左右半宽（米）
+@export var fist_arc: float = 0.3            # 圆柱半径（米，原名 arc 沿用）
 @export var fist_cooldown: float = 0.4
 @export var fist_knockback: float = 2.0
 @export var hit_delay: float = 0.18
@@ -62,7 +62,7 @@ func _do_attack() -> void:
 	var weapon := _get_weapon()
 	var dmg: float = fist_damage + (weapon.damage if weapon else 0)
 	var rng: float = fist_range + (weapon.attack_range if weapon else 0)
-	var half_w: float = fist_arc + (weapon.attack_arc if weapon else 0)
+	var r: float = fist_arc + (weapon.attack_arc if weapon else 0)
 	var knock: float = fist_knockback + (weapon.knockback if weapon else 0)
 	_cooldown_left = fist_cooldown + (weapon.cooldown if weapon else 0)
 
@@ -75,21 +75,38 @@ func _do_attack() -> void:
 	await get_tree().create_timer(hit_delay).timeout
 	if not is_instance_valid(_player) or _player.get("_dead"):
 		return
-	_apply_hits(dmg, rng, half_w, knock)
+	_apply_hits(dmg, rng, r, knock)
 
 
-func _apply_hits(dmg: float, rng: float, half_w: float, knock: float) -> void:
+func _apply_hits(dmg: float, rng: float, radius: float, knock: float) -> void:
 	var tolerance: float = 0.4
 
 	for node in get_tree().get_nodes_in_group("damageable"):
 		if not is_instance_valid(node) or not (node is Node3D):
 			continue
 		var local_pos: Vector3 = _player.to_local(node.global_position)
-		local_pos.y = 0.0
-		# 矩形判定：前方 -rng~0 内，左右 ±half_w 内
+
+		# 圆柱判定：前方 -rng~0 内，横向（含Y）≤ 半径
 		if local_pos.z > -tolerance or local_pos.z < -rng - tolerance:
 			continue
-		if abs(local_pos.x) > half_w + tolerance:
+
+		# 估算目标碰撞体半径，用于体积判定
+		var target_r := 0.0
+		var cols := node.find_children("*", "CollisionShape3D", false, false)
+		if not cols.is_empty():
+			var col := cols[0] as CollisionShape3D
+			if col and col.shape:
+				if col.shape is SphereShape3D:
+					target_r = col.shape.radius
+				elif col.shape is CapsuleShape3D:
+					target_r = col.shape.radius
+				elif col.shape is CylinderShape3D:
+					target_r = col.shape.radius
+				elif col.shape is BoxShape3D:
+					target_r = maxf(col.shape.size.x, col.shape.size.z) * 0.5
+
+		var h_dist := Vector2(local_pos.x, local_pos.y).length()
+		if h_dist > radius + tolerance + target_r:
 			continue
 
 		var health: Node = node.get_node_or_null("Health")

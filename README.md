@@ -190,15 +190,25 @@ world_3d._ready()
 
 ### 攻击判定范围
 
-**类型：** 矩形（自 v3.3.4 起）
+**类型：** 圆柱（自 v3.3.4 起）
 **文件：** `scripts/combat/melee_controller.gd` — `_apply_hits()`
 
 攻击范围由两个参数定义，单位均为**米**：
 - `fist_range` — 前方攻击距离（拳头默认 1m）
-- `fist_arc` — 左右半宽（拳头默认 0.3m，总宽 0.6m）
+- `fist_arc` — 圆柱半径（拳头默认 0.3m，原名 arc 沿用）
 - 武器通过 `attack_range` / `attack_arc` 加成叠加
 
-判定方式：将目标位置转换到玩家局部空间，检查是否落在 `[-rng, 0]` × `[-half_w, half_w]` 矩形内（含 0.4m 宽容度）。
+判定方式：
+1. 将目标位置转换到玩家局部空间
+2. 检查 Z 是否落在 `[-rng, 0]` 内（前方）
+3. 检查横向距离 `sqrt(x² + y²)` ≤ 半径（含 0.4m 宽容度）
+4. **Y 轴高度参与计算**，高度差过大的目标不会被命中
+
+**碰撞体积判定**（而非中心点）：
+- 自动查找目标的 CollisionShape3D
+- 支持 SphereShape3D、CapsuleShape3D、CylinderShape3D、BoxShape3D
+- 提取碰撞体半径加到宽容度中，目标**边缘进入范围即可命中**
+- 无碰撞体的目标按中心点判定
 
 `melee_controller.gd` 顶部 `@export` 变量为拳头基础值，`data/items/weapons/*.tres` 中的值为武器加成值，最终范围 = 拳头基础 + 武器加成。
 
