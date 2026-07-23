@@ -1,6 +1,6 @@
-# TopDownGame3D v3.3
+# TopDownGame3D v3.3.2
 
-> Godot 4.7.1 · 俯视角 3D · 全 GDScript · 2026-07-29
+> Godot 4.7.1 · 俯视角 3D · 全 GDScript · 2026-07-23
 
 ---
 
