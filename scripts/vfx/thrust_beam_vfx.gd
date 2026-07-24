@@ -13,6 +13,7 @@ var _t: float = 0.0
 var _playing: bool = false
 var _beam_started: bool = false
 var _particle_spawned: bool = false
+var _start_z: float = 0.0  # 突刺起始 Z 位置
 
 
 func _ready() -> void:
@@ -111,7 +112,7 @@ func _setup_side_splash() -> void:
 	ppm.scale_min = 0.03
 	ppm.scale_max = 0.12
 	ppm.lifetime_randomness = 0.4
-	ppm.color_ramp = _gradient_tex(Color(0.7, 0.95, 1.0, 0.8), Color(0.0, 0.3, 0.6, 0.0))
+	ppm.color_ramp = _gradient_tex(Color(0.532, 0.471, 0.126, 0.8), Color(0.0, 0.3, 0.6, 0.0))
 	_side_splash.process_material = ppm
 	_side_splash.draw_pass_1 = _make_quad(0.12)
 	add_child(_side_splash)
@@ -139,7 +140,7 @@ func _setup_impact_burst() -> void:
 	ppm.scale_min = 0.05
 	ppm.scale_max = 0.25
 	ppm.lifetime_randomness = 0.5
-	ppm.color_ramp = _gradient_tex(Color(1, 1, 1, 1), Color(0.2, 0.6, 1.0, 0.0))
+	ppm.color_ramp = _gradient_tex(Color(0.945, 0.886, 0.554, 1.0), Color(0.2, 0.6, 1.0, 0.0))
 	_impact_burst.process_material = ppm
 	_impact_burst.draw_pass_1 = _make_quad(0.2)
 	add_child(_impact_burst)
@@ -153,6 +154,7 @@ func play() -> void:
 	_side_splash.emitting = false
 	_impact_burst.emitting = false
 	visible = false
+	_start_z = position.z
 
 
 func _process(delta: float) -> void:
@@ -180,6 +182,9 @@ func _process(delta: float) -> void:
 		_mat.set_shader_parameter("progress", p)
 		var fade := 1.0 - p
 		_mat.set_shader_parameter("intensity", 4.0 * fade)
+
+		# 向前突刺：光束在可见期间沿 local -Z 移动 0.4m
+		position.z = _start_z + lerpf(0.0, -0.4, p)
 
 	if _t >= 0.2:
 		_playing = false

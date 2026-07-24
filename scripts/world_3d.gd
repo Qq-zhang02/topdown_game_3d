@@ -153,8 +153,7 @@ func _create_ground() -> void:
 	plane.size = Vector2(total_size, total_size)
 	ground.mesh = plane
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.25, 0.38, 0.15)
-	mat.albedo_texture = _make_noise_texture(0.015, randi())
+	mat.albedo_texture = _make_terrain_texture()
 	mat.roughness = 0.9
 	mat.metallic = 0.0
 	ground.material_override = mat
@@ -172,18 +171,51 @@ func _create_ground() -> void:
 	add_child(body)
 
 
-func _make_noise_texture(frequency: float, seed: int) -> NoiseTexture2D:
-	var fast_noise := FastNoiseLite.new()
-	fast_noise.seed = seed
-	fast_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	fast_noise.frequency = frequency
-	fast_noise.fractal_octaves = 3
-	var tex := NoiseTexture2D.new()
-	tex.noise = fast_noise
-	tex.width = 256
-	tex.height = 256
-	tex.seamless = true
-	return tex
+func _make_terrain_texture() -> Texture2D:
+	# 双层噪声：低频率决定大块区域（草地/泥土/石块），高频率叠加微观细节
+	var biome_noise := FastNoiseLite.new()
+	biome_noise.seed = randi()
+	biome_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	biome_noise.frequency = 0.015
+	biome_noise.fractal_octaves = 4
+	biome_noise.fractal_lacunarity = 2.0
+	biome_noise.fractal_gain = 0.5
+
+	var detail_noise := FastNoiseLite.new()
+	detail_noise.seed = randi()
+	detail_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	detail_noise.frequency = 0.06
+	detail_noise.fractal_octaves = 2
+
+	var size := 512
+	var img := Image.create(size, size, false, Image.FORMAT_RGBA8)
+
+	for y in range(size):
+		for x in range(size):
+			var n := biome_noise.get_noise_2d(x, y)   # -1~1
+			var d := detail_noise.get_noise_2d(x, y)  # -1~1
+			var blend := d * 0.15
+
+			var color: Color
+			if n + blend > 0.25:
+				# 草地 — 鲜绿到黄绿
+				var t := (n + blend - 0.25) / 0.75
+				color = Color(0.22, 0.42, 0.12).lerp(Color(0.38, 0.55, 0.18), t)
+			elif n + blend > -0.15:
+				# 泥土过渡带 — 棕色到草地渐变
+				var t := (n + blend + 0.15) / 0.4
+				color = Color(0.50, 0.33, 0.16).lerp(Color(0.22, 0.42, 0.12), t)
+			else:
+				# 石块地 — 灰色到深灰，夹带少量泥色
+				var t := clampf((n + blend + 0.15) / 0.3, 0.0, 1.0)
+				color = Color(0.55, 0.52, 0.48).lerp(Color(0.45, 0.38, 0.30), 1.0 - t)
+
+			# 微观细节：像素级亮度波动
+			color *= 0.90 + 0.20 * d
+
+			img.set_pixel(x, y, color)
+
+	return ImageTexture.create_from_image(img)
 
 
 # ═══════════════════════════════════════════

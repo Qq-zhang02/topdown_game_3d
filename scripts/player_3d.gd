@@ -10,7 +10,7 @@ enum AnimState { IDLE, RUN, JUMP }
 var _model_path: String = "res://models/character/character-archer.glb"
 var _skin_path: String = "res://models/character/colormap.png"
 
-@export var speed: float = 5.0
+@export var speed: float = 4.0
 @export var jump_velocity: float = 15.0
 @export var gravity: float = 35.0
 @export var rotation_lag: float = 0.0  # 转向迟滞，越高转向越笨重，最高加到0.95
@@ -404,7 +404,7 @@ func _physics_process(delta: float) -> void:
 		velocity.y = jump_velocity
 
 	var input_dir := Input.get_vector("move_left", "move_right", "move_up", "move_down")
-	var current_speed: float = speed * 0.5 if is_aiming() else speed
+	var current_speed: float = speed * 0.25 if is_aiming() else speed #瞄准状态下减速
 	velocity.x = input_dir.x * current_speed
 	velocity.z = input_dir.y * current_speed
 	# 击退（叠加后衰减）
