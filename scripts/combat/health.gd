@@ -47,9 +47,16 @@ func set_particle_offset_scale(s: float) -> void:
 	particle_offset_scale = s
 
 
+var _tinting: bool = false
+
 func _tint_parent_red() -> void:
+	if _tinting:
+		return
+	_tinting = true
+
 	var parent := get_parent() as Node3D
 	if not parent:
+		_tinting = false
 		return
 	for mesh: MeshInstance3D in parent.find_children("*", "MeshInstance3D", true, false):
 		var m: Mesh = mesh.mesh
@@ -68,6 +75,7 @@ func _tint_parent_red() -> void:
 			mesh.set_surface_override_material(i, mat)
 			var tw := create_tween()
 			tw.tween_property(std_mat, "albedo_color", orig_color, 0.3)
+			tw.tween_callback(func(): _tinting = false)
 
 
 func _spawn_hit_particles(from_position: Vector3 = Vector3.ZERO) -> void:

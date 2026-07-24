@@ -5,7 +5,7 @@ class_name Player3D
 const EquipmentClass := preload("res://scripts/equipment.gd")
 
 # 动画状态
-enum AnimState { IDLE, RUN, JUMP }
+enum AnimState { IDLE, RUN, JUMP, FALL }
 
 var _model_path: String = "res://models/character/character-archer.glb"
 var _skin_path: String = "res://models/character/colormap.png"
@@ -28,6 +28,11 @@ var _dead: bool = false
 var _attacking: bool = false
 var _knockback: Vector3 = Vector3.ZERO
 var _target_yaw: float = 0.0
+var _in_water: bool = false
+var _stepped_up_last_frame: bool = false
+var _collision_shape: CollisionShape3D
+var _step_fail_pos: Vector3 = Vector3.INF
+var _step_fail_cd: float = 0.0
 
 
 func set_model_path(path: String) -> void:
@@ -125,6 +130,7 @@ func _create_collision() -> void:
 		shape.height = 1.6
 		col.shape = shape
 		add_child(col)
+		_collision_shape = col
 		return
 
 	var aabb := _get_model_aabb(_model_root)
@@ -135,6 +141,7 @@ func _create_collision() -> void:
 		shape.height = 1.6
 		col.shape = shape
 		add_child(col)
+		_collision_shape = col
 		return
 
 	var col := CollisionShape3D.new()
@@ -146,6 +153,7 @@ func _create_collision() -> void:
 	# to_local 确保在世界坐标->本地坐标正确转换
 	col.position = to_local(aabb.position + aabb.size * 0.5)
 	add_child(col)
+	_collision_shape = col
 
 
 # ═══════════════════════════════════════════
@@ -178,6 +186,8 @@ func _setup_animations() -> void:
 			_anim_map["run"] = a
 		elif "jump" in lower:
 			_anim_map["jump"] = a
+		elif "fall" in lower:
+			_anim_map["fall"] = a
 
 	# 移动动画循环，攻击/死亡不循环
 	for key in _anim_map:
@@ -197,7 +207,9 @@ func _update_animation(input_length: float) -> void:
 		return
 
 	var new_state: AnimState
-	if not is_on_floor():
+	if _in_water:
+		new_state = AnimState.FALL
+	elif not is_on_floor():
 		new_state = AnimState.JUMP
 	elif input_length > 0.1:
 		new_state = AnimState.RUN
@@ -217,6 +229,11 @@ func _update_animation(input_length: float) -> void:
 				_anim_player.play(_anim_map["run"])
 		AnimState.JUMP:
 			if _anim_map.has("jump"):
+				_anim_player.play(_anim_map["jump"])
+		AnimState.FALL:
+			if _anim_map.has("fall"):
+				_anim_player.play(_anim_map["fall"])
+			elif _anim_map.has("jump"):
 				_anim_player.play(_anim_map["jump"])
 
 
@@ -393,14 +410,21 @@ func is_aiming() -> bool:
 	return Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
 
 
+func set_in_water(v: bool) -> void:
+	_in_water = v
+
+
 func _physics_process(delta: float) -> void:
 	if _dead:
 		return
 
-	if not is_on_floor():
+	if _in_water:
+		# 水中缓慢下沉，覆盖重力和跳跃
+		velocity.y = -2.0
+	elif not is_on_floor():
 		velocity.y -= gravity * delta
 
-	if Input.is_action_just_pressed("jump") and is_on_floor():
+	if Input.is_action_just_pressed("jump") and is_on_floor() and not _in_water:
 		velocity.y = jump_velocity
 
 	var input_dir := Input.get_vector("move_left", "move_right", "move_up", "move_down")
@@ -411,11 +435,87 @@ func _physics_process(delta: float) -> void:
 	velocity += _knockback
 	_knockback = _knockback.lerp(Vector3.ZERO, delta * 4.0)
 
+	# 跨步失败回退：上帧抬升后撞墙悬空 -> 退回原高度
+	if _stepped_up_last_frame:
+		_stepped_up_last_frame = false
+		if is_on_wall() and not is_on_floor():
+			global_position.y -= STEP_HEIGHT
+			_step_fail_pos = global_position
+			_step_fail_cd = 0.2
+		else:
+			_step_fail_pos = Vector3.INF
+			_step_fail_cd = 0.0
+
+	_step_up(delta)
+
 	move_and_slide()
 
 	_face_mouse(delta)
 	_update_animation(input_dir.length())
 
+@export var STEP_HEIGHT: float = 0.8 # 跨越高度（米）
+@export var STEP_FORWARD: float = 0.15 # 前探距离
+@export var STEP_FAIL_BLOCK_RADIUS: float = 0.3 # 失败阻断半径
+
+
+func _step_up(delta: float) -> void:
+	# 失败 CD 倒计时
+	if _step_fail_cd > 0.0:
+		_step_fail_cd -= delta
+	if _step_fail_pos != Vector3.INF and global_position.distance_to(_step_fail_pos) < STEP_FAIL_BLOCK_RADIUS and _step_fail_cd > 0.0:
+		return
+	if _step_fail_cd <= 0.0:
+		_step_fail_pos = Vector3.INF
+
+	if not is_on_floor() or _in_water:
+		return
+
+	var h_vel := Vector3(velocity.x, 0.0, velocity.z)
+	var h_speed := h_vel.length()
+	if h_speed < 0.01:
+		return
+	var h_dir := h_vel / h_speed
+
+	# 1) 近距法线探测：区分垂直台阶和斜坡
+	var probe := move_and_collide(h_dir * 0.1, true)
+	if not probe:
+		return
+	if probe.get_normal().y > cos(floor_max_angle):
+		return
+
+	var space := get_world_3d().direct_space_state
+	if not _collision_shape or not _collision_shape.shape:
+		return
+	var body_shape: Shape3D = _collision_shape.shape
+
+	var q := PhysicsShapeQueryParameters3D.new()
+	q.shape = body_shape
+	q.collision_mask = collision_mask
+	q.exclude = [self]
+	q.margin = 0.02
+
+	# 用碰撞体实际世界位置（零旋转），避免朝向影响
+	var col_origin := _collision_shape.global_position
+
+	# 2) 上方净空：轴对齐静态检测
+	q.transform = Transform3D(Basis(), col_origin + Vector3.UP * STEP_HEIGHT)
+	if not space.intersect_shape(q, 1).is_empty():
+		return
+
+	# 3) 从抬升位置向前：是否净空？
+	var fwd_offset: Vector3 = h_dir * max(STEP_FORWARD, h_speed * delta)
+	q.transform = Transform3D(Basis(), col_origin + Vector3.UP * STEP_HEIGHT + fwd_offset)
+	if not space.intersect_shape(q, 1).is_empty():
+		return
+
+	# 4) 前方下方是否有支撑地面？（防悬崖/深坑）
+	q.transform = Transform3D(Basis(), col_origin + fwd_offset + Vector3(0.0, -STEP_HEIGHT * 0.3, 0.0))
+	if space.intersect_shape(q, 1).is_empty():
+		return
+
+	# 5) 全部通过，执行抬升
+	global_position.y += STEP_HEIGHT
+	_stepped_up_last_frame = true
 
 const ROTATION_DAMPING: float = 12.0 #初始转向速度
 

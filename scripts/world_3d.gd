@@ -10,7 +10,7 @@ var _obstacle_data: Array[Dictionary] = []
 var _occupied: Array[AABB] = []  # 障碍物/资源/建筑占地区域（建造系统用）
 var _day_night: Node
 var _player: CharacterBody3D
-var _ocean: Node3D
+var _lava: Node3D
 var _buildings_data: Array[Dictionary] = []  # 建筑记录 [{resource_path, position, rot_y}]
 var _play_time: float = 0.0                 # 累计游玩时间（秒）
 var _save_slot: int = -1                    # 当前存档槽位
@@ -20,6 +20,7 @@ var _save_toast: Label                        # 自动存档提示标签
 var _hp_fill: ColorRect                       # 血条填充引用
 var _hp_label: Label                          # 血条文本引用
 var _damage_flash: ColorRect                  # 受伤红色闪烁
+var _height_label: Label
 var _loading_save: bool = false               # 是否正在加载存档（跳过初始保存）
 var _resource_positions: Array[Dictionary] = []  # 资源节点位置存档 [{kind, pos_x, pos_z}]
 var _regen_timer: float = 0.0                    # 资源重生计时器
@@ -81,9 +82,9 @@ func _on_game_started(model_path: String, skin_path: String, save_slot: int) -> 
 	_create_lighting()
 	_create_ground()
 	_create_obstacles()
-	_create_ocean()
+	_create_lava()
 	_create_player(model_path, skin_path)
-	_ocean.setup(_player, _player.get_health())
+	_lava.setup(_player, _player.get_health())
 	_create_day_night_system()       # ★ 必须在动物之前创建
 	if not _loading_save:
 		_create_resource_nodes()
@@ -97,6 +98,7 @@ func _on_game_started(model_path: String, skin_path: String, save_slot: int) -> 
 	_create_menu()
 	_create_time_display()
 	_create_hp_bar()
+	_create_height_display()
 	_create_damage_flash()
 	_game_started = true
 	# 创建自动存档提示
@@ -172,7 +174,6 @@ func _create_ground() -> void:
 
 
 func _make_terrain_texture() -> Texture2D:
-	# 双层噪声：低频率决定大块区域（草地/泥土/石块），高频率叠加微观细节
 	var biome_noise := FastNoiseLite.new()
 	biome_noise.seed = randi()
 	biome_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
@@ -192,43 +193,34 @@ func _make_terrain_texture() -> Texture2D:
 
 	for y in range(size):
 		for x in range(size):
-			var n := biome_noise.get_noise_2d(x, y)   # -1~1
-			var d := detail_noise.get_noise_2d(x, y)  # -1~1
+			var n := biome_noise.get_noise_2d(x, y)
+			var d := detail_noise.get_noise_2d(x, y)
 			var blend := d * 0.15
 
 			var color: Color
 			if n + blend > 0.25:
-				# 草地 — 鲜绿到黄绿
 				var t := (n + blend - 0.25) / 0.75
 				color = Color(0.22, 0.42, 0.12).lerp(Color(0.38, 0.55, 0.18), t)
 			elif n + blend > -0.15:
-				# 泥土过渡带 — 棕色到草地渐变
 				var t := (n + blend + 0.15) / 0.4
 				color = Color(0.50, 0.33, 0.16).lerp(Color(0.22, 0.42, 0.12), t)
 			else:
-				# 石块地 — 灰色到深灰，夹带少量泥色
 				var t := clampf((n + blend + 0.15) / 0.3, 0.0, 1.0)
 				color = Color(0.55, 0.52, 0.48).lerp(Color(0.45, 0.38, 0.30), 1.0 - t)
 
-			# 微观细节：像素级亮度波动
 			color *= 0.90 + 0.20 * d
-
 			img.set_pixel(x, y, color)
 
 	return ImageTexture.create_from_image(img)
 
 
-# ═══════════════════════════════════════════
-# 海洋（地图边界：落水持续掉血致死）
-# ═══════════════════════════════════════════
-
-func _create_ocean() -> void:
-	var OceanScript := load("res://scripts/world/ocean.gd")
-	_ocean = Node3D.new()
-	_ocean.set_script(OceanScript)
-	_ocean.name = "Ocean"
-	add_child(_ocean)
-	_ocean.build(WORLD_HALF)
+func _create_lava() -> void:
+	var LavaScript := load("res://scripts/world/lava.gd")
+	_lava = Node3D.new()
+	_lava.set_script(LavaScript)
+	_lava.name = "Lava"
+	add_child(_lava)
+	_lava.build(WORLD_HALF)
 
 
 # ═══════════════════════════════════════════
@@ -836,6 +828,30 @@ func _create_hp_bar() -> void:
 	_update_hp_bar()
 
 
+func _create_height_display() -> void:
+	var layer := CanvasLayer.new()
+	layer.name = "HeightLayer"
+	layer.layer = 40
+	add_child(layer)
+
+	_height_label = Label.new()
+	_height_label.name = "HeightLabel"
+	_height_label.position = Vector2(15, 312)
+	_height_label.size = Vector2(120, 22)
+	_height_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_height_label.add_theme_font_size_override("font_size", 13)
+	_height_label.add_theme_color_override("font_color", Color(0.7, 0.85, 1.0))
+	_height_label.text = "Y: 0.0m"
+	layer.add_child(_height_label)
+
+
+func _update_height_display() -> void:
+	if not _player:
+		return
+	var y := _player.global_position.y
+	_height_label.text = "Y: %.1fm" % y
+
+
 func _on_hp_changed(amount: float, from: Vector3) -> void:
 	_update_hp_bar()
 	if amount > 0.0:
@@ -891,8 +907,9 @@ func _knockback_player(from: Vector3) -> void:
 		return
 	var dir := (_player.global_position - from)
 	dir.y = 0.0
+	# 自己对自己造成的伤害（溺水）不触发击退
 	if dir.length_squared() < 0.01:
-		dir = Vector3.RIGHT
+		return
 	dir = dir.normalized()
 	# 击退只做水平，不干扰跳跃判定
 	_player.apply_knockback(dir, 8.0)
@@ -934,6 +951,8 @@ func _process(delta: float) -> void:
 		if _auto_save_timer >= 60.0:
 			_auto_save_timer = 0.0
 			_save_current_game()
+
+		_update_height_display()
 
 
 func _notification(what: int) -> void:
