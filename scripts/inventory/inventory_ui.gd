@@ -1,6 +1,6 @@
 extends CanvasLayer
 class_name InventoryUI
-## 背包界面：8x4 格子，Tab 开关，鼠标拖拽整理，右键使用物品
+## 背包界面：8x4 格子，Tab 开关，鼠标拖拽整理，右键菜单（装备/卸下/使用）
 
 signal item_used(item_data: Resource, slot_index: int)
 
@@ -14,15 +14,19 @@ const PANEL_PAD := 16
 const TITLE_H := 40
 
 var _inventory: Node
+var _equip_mgr: Node
 var _panel: Panel
 var _slots: Array[Panel] = []
 var _name_labels: Array[Label] = []
 var _count_labels: Array[Label] = []
 var _bg_styles: Array[StyleBoxFlat] = []
+var _context_menu: PopupMenu
+var _context_slot: int = -1
 
 
-func setup(inv: Node) -> void:
+func setup(inv: Node, equip_mgr: Node) -> void:
 	_inventory = inv
+	_equip_mgr = equip_mgr
 	layer = 60
 	add_to_group("inventory_ui")
 	_build()
@@ -49,14 +53,7 @@ func _input(event: InputEvent) -> void:
 	if not visible:
 		return
 
-	# 右键使用物品
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
-		var idx := _get_hovered_slot_index()
-		if idx >= 0:
-			var st: ItemStack = _inventory.get_stack(idx) as ItemStack
-			if st and st.item.get("heal_amount") > 0.0:
-				_consume_slot(idx, st)
-				get_viewport().set_input_as_handled()
+	# 右键菜单已由 InventorySlot._gui_input 处理，这里不再处理右键
 
 
 func _build() -> void:
@@ -77,7 +74,7 @@ func _build() -> void:
 	root.add_child(_panel)
 
 	var title := Label.new()
-	title.text = "背包　（Tab 关闭 · 拖拽整理）"
+	title.text = "背包　（Tab 关闭 · 拖拽整理 · 右键操作）"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 18)
 	title.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95))
@@ -128,6 +125,15 @@ func _build() -> void:
 		slot.add_child(count_label)
 		_count_labels.append(count_label)
 
+	# 右键菜单
+	_context_menu = PopupMenu.new()
+	_context_menu.name = "ContextMenu"
+	_context_menu.add_item("装备", 0)
+	_context_menu.add_item("卸下", 1)
+	_context_menu.add_item("使用", 2)
+	_context_menu.id_pressed.connect(_on_context_action)
+	root.add_child(_context_menu)
+
 
 func _panel_width() -> float:
 	return COLS * SLOT_SIZE.x + (COLS - 1) * GAP + PANEL_PAD * 2
@@ -155,35 +161,80 @@ func _refresh() -> void:
 			name_label.text = st.item.get("display_name")
 			count_label.text = "x%d" % st.count if st.count > 1 else ""
 			var c: Color = st.item.get("ui_color")
-			bg.bg_color = Color(c.r * 0.45, c.g * 0.45, c.b * 0.45, 0.90)
-			bg.border_color = Color(c.r, c.g, c.b, 0.8)
+			var item_id: String = st.item.get("id")
+			
+			if _equip_mgr and _equip_mgr.is_item_equipped(item_id):
+				bg.bg_color = Color(c.r * 0.55, c.g * 0.55, c.b * 0.35, 1.0)
+				bg.border_color = Color(1.0, 0.85, 0.2, 1.0)
+				bg.border_width_bottom = 2; bg.border_width_left = 2
+				bg.border_width_right = 2; bg.border_width_top = 2
+			else:
+				bg.bg_color = Color(c.r * 0.45, c.g * 0.45, c.b * 0.45, 0.90)
+				bg.border_color = Color(c.r, c.g, c.b, 0.8)
+				bg.border_width_bottom = 1; bg.border_width_left = 1
+				bg.border_width_right = 1; bg.border_width_top = 1
+			
+			if st.item.get("heal_amount") > 0.0:
+				count_label.text = ("+%d♥ x%d" % [int(st.item.get("heal_amount")), st.count]) if st.count > 1 else ("+%d♥" % int(st.item.get("heal_amount")))
 		else:
 			name_label.text = ""
 			count_label.text = ""
 			bg.bg_color = Color(0.14, 0.14, 0.16, 0.70)
 			bg.border_color = Color(0.35, 0.35, 0.40, 0.4)
 
-			# 可食用物品标记
-			if st and st.item.get("heal_amount") > 0.0:
-				count_label.text = ("♥%d  x%d" % [int(st.item.get("heal_amount")), st.count]) if st.count > 1 else ("♥%d" % int(st.item.get("heal_amount")))
+
+func _show_context_menu(slot_index: int, screen_pos: Vector2) -> void:
+	_context_slot = slot_index
+	var st = _inventory.get_stack(slot_index)
+	if not st:
+		return
+
+	var item = st.item
+	var item_id: String = item.get("id")
+	var itype: int = item.get("item_type")
+	var is_cons: bool = item.get("heal_amount") > 0.0
+
+	# 根据物品类型和装备状态设置菜单项
+	if itype == 1: # EQUIPMENT — 功能装备
+		var is_equipped: bool = _equip_mgr.is_utility_equipped(item_id)
+		_context_menu.set_item_disabled(0, is_equipped)   # 装备
+		_context_menu.set_item_disabled(1, not is_equipped) # 卸下
+		_context_menu.set_item_disabled(2, true)            # 使用 — 灰色
+
+	elif itype == 2: # WEAPON
+		var is_equipped: bool = _equip_mgr.is_weapon_equipped(item_id)
+		_context_menu.set_item_disabled(0, is_equipped)
+		_context_menu.set_item_disabled(1, not is_equipped)
+		_context_menu.set_item_disabled(2, true)
+
+	elif is_cons: # 消耗品
+		var is_equipped: bool = _equip_mgr.is_consumable_equipped(item_id)
+		_context_menu.set_item_disabled(0, is_equipped)
+		_context_menu.set_item_disabled(1, not is_equipped)
+		_context_menu.set_item_disabled(2, false)
+
+	else:
+		return # 普通材料不显示菜单
+
+	_context_menu.position = screen_pos
+	_context_menu.popup()
 
 
-func _get_hovered_slot_index() -> int:
-	var mp := _panel.get_local_mouse_position()
-	if mp.x < PANEL_PAD or mp.y < TITLE_H + PANEL_PAD:
-		return -1
-	for i in range(_slots.size()):
-		var slot := _slots[i]
-		var r := Rect2(slot.position, slot.size)
-		if r.has_point(mp):
-			return i
-	return -1
+func _on_context_action(id: int) -> void:
+	if _context_slot < 0:
+		return
+	var st = _inventory.get_stack(_context_slot)
+	if not st:
+		return
 
-
-func _consume_slot(idx: int, st: ItemStack) -> void:
-	var heal: float = st.item.get("heal_amount")
-	st.count -= 1
-	if st.count <= 0:
-		_inventory.slots[idx] = null
-	_inventory.changed.emit()
-	item_used.emit(st.item, idx)
+	match id:
+		0: # 装备
+			if _equip_mgr and _equip_mgr.has_method("equip_from_inventory"):
+				_equip_mgr.equip_from_inventory(_context_slot)
+		1: # 卸下
+			if _equip_mgr and _equip_mgr.has_method("unequip_item_from_inventory"):
+				_equip_mgr.unequip_item_from_inventory(_context_slot)
+		2: # 使用
+			if _equip_mgr and _equip_mgr.has_method("use_from_inventory"):
+				_equip_mgr.use_from_inventory(_context_slot)
+				item_used.emit(st.item, _context_slot)

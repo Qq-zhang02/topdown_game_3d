@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="Equipment" format=3 uid="uid://6pivr5l775dn"]
+
+[ext_resource type="Script" uid="uid://ccyub4kmt0udp" path="res://scripts/equipment.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+light_type = 1
+light_color = Color(1, 0.95, 0.8, 1)
+light_energy = 8.0
+light_indirect_energy = 1.5
+shadow_enabled = true
+position_offset = Vector3(0, 1, -0.4)
+rotation_offset = Vector3(-0.349066, 0, 0)
+spot_range = 50.0
+spot_attenuation = 0.8
+spot_angle = 65.0
+id = "flashlight"
+display_name = "手电筒"
+description = "指向性光源，照亮前方"
+item_type = 1
+max_stack = 1
+ui_color = Color(1, 0.9490196, 0.8, 1)

@@ -1,6 +1,6 @@
-# TopDownGame3D v3.3.5
+# TopDownGame3D v3.4.0
 
-> Godot 4.7.1 · 俯视角 3D · 全 GDScript · 2026-07-24
+> Godot 4.7.1 · 俯视角 3D · 全 GDScript · 2026-07-26
 
 ---
 
@@ -25,7 +25,8 @@ topdown_game_3d-v3/
 ├── data/                      # ★ 数据驱动内容：新增物品/建筑 = 加 .tres，零代码
 │   ├── items/                 # 物品（ItemDB 自动扫描，按 id 取用）
 │   │   ├── wood.tres / stone.tres / meat.tres
-│   │   └── weapons/sword_wood.tres
+│   │   ├── weapons/sword_wood.tres
+│   │   └── equipment/flashlight.tres / torch.tres
 │   └── buildings/             # 建筑配方（BuildController 自动扫描）
 │       ├── campfire.tres / wooden_wall.tres / foundation.tres
 ├── scripts/
@@ -35,8 +36,8 @@ topdown_game_3d-v3/
 │   │   └── item_db.gd         # 物品数据库：扫描 data/items/，ItemDB.get_item(id)
 │   ├── inventory/
 │   │   ├── inventory.gd       # 背包数据层：32格，增删/堆叠/消耗，changed 信号
-│   │   ├── inventory_ui.gd    # 背包界面：8x4，Tab 开关，拖拽整理
-│   │   └── inventory_slot.gd  # 背包格子（拖拽逻辑）
+│   │   ├── inventory_ui.gd    # 背包界面：8x4，Tab 开关，拖拽整理，右键菜单（装备/卸下/使用）
+│   │   └── inventory_slot.gd  # 背包格子（拖拽 + 右键菜单）
 │   ├── combat/
 │   │   ├── health.gd          # 通用血量组件（受击红闪+溅射粒子，自动覆盖所有挂载者）
 │   │   ├── melee_controller.gd# 近战：左键扇形判定，伤害取自当前 WeaponData
@@ -54,8 +55,8 @@ topdown_game_3d-v3/
 │   ├── world_3d.gd            # 世界总管（占地登记/建造放置/各系统组装）
 │   ├── player_3d.gd           # 玩家：移动/朝向(反应速度阻尼)/装备/血量/背包/近战/动画
 │   ├── equipment.gd           # 光源装备（继承 ItemData：手电筒/火把）
-│   ├── equipment_manager.gd   # 装备管理器（F 切换，武器也走这里）
-│   ├── equipment_hud.gd       # 底部装备栏
+│   ├── equipment_manager.gd   # 装备管理器：功能装备(F)/武器(Q)/消耗品(1/2/3) 三区管理，冷却系统
+│   ├── equipment_hud.gd       # 底部装备栏：三区布局 + 冷却覆盖动画
 │   ├── camera_follow_3d.gd / minimap_3d.gd / day_night_cycle.gd
 │   ├── animal_spawner.gd      # 动物生成（+血量/掉落生肉）
 │   ├── animal_behavior.gd     # 动物行为
@@ -95,8 +96,10 @@ world_3d._ready()
 |------|------|
 | WASD / 鼠标 / Space | 移动 / 朝向 / 跳跃 |
 | **鼠标左键** | 近战攻击（手持武器用武器参数，否则拳头） |
-| F | 切换装备（手电筒→火把→木剑→关） |
-| **Tab** | 背包（拖拽整理，右键使用可食用物品） |
+| **F** | 切换功能装备（手电筒→火把→关） |
+| **Q** | 切换武器（木剑→关） |
+| **1 / 2 / 3** | 使用对应消耗品栏位物品（8 秒冷却） |
+| **Tab** | 背包（拖拽整理，右键物品 → 装备 / 卸下 / 使用） |
 | **B** | 建造菜单 → 选配方 → 幽灵预览 → 左键放置 |
 | **R** | 建造时旋转 90° |
 | 右键(按住) | **瞄准**（移速降至1/4 + 摄像机平滑偏移到鼠标指向处）；建造中点右键取消 |
@@ -175,12 +178,12 @@ var current_speed: float = speed * 0.25 if is_aiming() else speed
 - **新建筑** → `data/buildings/` 加 .tres（BuildingData：尺寸/颜色/成本/发光），建造菜单自动出现
 - **新的可攻击对象** → 挂 `health.gd`（命名 "Health"）+ 加入 `"damageable"` 组，近战即可命中
 - **新光源装备** → 代码里 new Equipment（参考 player_3d.gd `_make_torch`）
-- **新掉落物** → `Pickup.spawn(parent, item_res, amount, pos)` 自动处理掉落动画 + 拾取飞行，按 `item_type` 分流到背包或装备管理器
+- **新掉落物** → `Pickup.spawn(parent, item_res, amount, pos)` 自动处理掉落动画 + 拾取飞行，所有物品统一进背包
 - **受击反馈** → 任何挂载 `health.gd` 的实体自动获得：模型闪红 0.3s + 彩色溅射粒子。粒子颜色通过 `set_particle_color()` 设置，默认白色
 
-**背包：** 32 格（8×4 网格），`Inventory.add_item()` 自动堆叠/填空格子，放不下返回剩余数量。
+**背包：** 32 格（8×4 网格），`Inventory.add_item()` 自动堆叠/填空格子，放不下返回剩余数量。物品装备后在背包中**金色高亮**标记，装备/卸下不改变背包内容。
 
-**装备管理器：** 通过 `equipped` 布尔属性控制装备是否出现在 F 切换循环中。武器（WeaponData）走装备管理器切换，切换时会通过 `rotation_lag` 自动更新玩家转向迟滞。
+**装备管理器：** 分为三个独立分区——**功能装备**（F 切换，存放手电筒/火把等光源）、**武器**（Q 切换，存放木剑等近战武器）、**消耗品**（3 个快捷栏位，1/2/3 即时使用，8s 冷却）。装备管理器和背包之间通过 `item_id` 引用而非持有副本，物品唯一存放在背包中。
 
 **信号解耦：** `health.died` / `inventory.changed` / `build_menu.recipe_selected`，系统间不直接引用。
 
@@ -558,10 +561,20 @@ ParticleProcessMaterial:
 - **溅射粒子**（health.gd 自动处理，圆形发光小球 + 透明度衰减）
 - 击退冲量：apply_knockback + lerp 衰减（~0.5秒），纯水平推开不干扰跳跃
 
-### 物品使用
+### 装备与物品使用
 
-- 背包右键使用可食用物品（生肉 ♥15 回血）
-- `ItemData.heal_amount > 0` 即可食用，新增物品设此属性即可
+**背包右键菜单**（装备 / 卸下 / 使用）：
+- 功能装备（手电筒、火把）和武器（木剑）：右键 → **装备** / **卸下**，"使用"灰色禁用
+- 消耗品（生肉）：右键 → **装备**（放入快捷栏） / **卸下**（从快捷栏移除） / **使用**（消耗一个回血 15HP）
+
+**装备栏三区操作**：
+- **F** 循环切换功能装备 → 激活光源效果，底部栏高亮当前装备
+- **Q** 循环切换武器 → 应用武器属性（伤害/范围/击退/迟滞），底部栏高亮当前武器
+- **1/2/3** 使用消耗品 → 消耗背包中对应物品，触发 8s 冷却，冷却以灰色覆盖条从底部向上缩小动画显示
+- 装备的物品在背包中**金色边框高亮**，卸下后取消高亮
+
+**装备新物品**：`data/items/equipment/` 下新建 .tres（Equipment 类），ItemDB 自动收录。
+`ItemData.heal_amount > 0` 即可食用的消耗品，新增物品设此属性即可。
 
 ---
 
@@ -584,7 +597,7 @@ ParticleProcessMaterial:
 
 | 类别 | 存储内容 |
 |------|---------|
-| 玩家 | 位置 (x,y,z)、血量、背包全部格子、当前装备索引、角色模型/皮肤 |
+| 玩家 | 位置 (x,y,z)、血量、背包全部格子、装备三区数据（功能装备ID列表+当前索引 / 武器ID列表+当前索引 / 消耗品栏位ID数组+冷却状态）、角色模型/皮肤 |
 | 世界 | 昼夜时间、已放置建筑、资源节点位置(树/石头)、存活动物数量 |
 | 元数据 | 版本号、时间戳、累计游玩时长 |
 

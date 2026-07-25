@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="Equipment" format=3 uid="uid://drgeaweoip88w"]
+
+[ext_resource type="Script" uid="uid://ccyub4kmt0udp" path="res://scripts/equipment.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+light_type = 2
+light_color = Color(1, 0.55, 0.15, 1)
+light_energy = 5.0
+position_offset = Vector3(0, 1.6, 0.3)
+omni_range = 6.0
+omni_attenuation = 0.8
+id = "torch"
+display_name = "火把"
+description = "全方位温暖光源"
+item_type = 1
+max_stack = 1
+ui_color = Color(1, 0.54901963, 0.14901961, 1)

@@ -118,18 +118,15 @@ func _on_body_entered(body: Node3D) -> void:
 	if not _can_pickup or _flying_to != null:
 		return
 
-	var type: int = item.get("item_type")
-
-	# 材料先尝试放入背包，放不下就不飞了
-	if type == 0:
-		var inv: Node = body.get_node_or_null("Inventory")
-		if inv == null:
-			return
-		var leftover: int = inv.add_item(item, count)
-		if leftover > 0:
-			count = leftover
-			_update_label()
-			return  # 背包满，留在原地
+	# 所有物品先进背包
+	var inv: Node = body.get_node_or_null("Inventory")
+	if inv == null:
+		return
+	var leftover: int = inv.add_item(item, count)
+	if leftover > 0:
+		count = leftover
+		_update_label()
+		return
 
 	# 开始飞向玩家
 	_flying_to = body
@@ -137,9 +134,4 @@ func _on_body_entered(body: Node3D) -> void:
 
 
 func _do_pickup(body: Node3D) -> void:
-	var type: int = item.get("item_type")
-	if type == 1 or type == 2:  # EQUIPMENT / WEAPON
-		var mgr: Node = body.get_node_or_null("EquipmentManager")
-		if mgr and mgr.has_method("add_equipment"):
-			mgr.add_equipment(item.duplicate())
 	queue_free()

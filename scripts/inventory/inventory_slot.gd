@@ -1,6 +1,6 @@
 extends Panel
 class_name InventorySlot
-## 背包格子：负责显示一个格位并处理拖拽
+## 背包格子：负责显示一个格位并处理拖拽 + 右键菜单
 
 var index: int = -1
 var ui: CanvasLayer  # InventoryUI
@@ -33,3 +33,10 @@ func _can_drop_data(_pos: Vector2, data: Variant) -> bool:
 func _drop_data(_pos: Vector2, data: Variant) -> void:
 	if ui:
 		ui.move_slot(int(data["from"]), index)
+
+
+func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+		if ui and ui.has_method("_show_context_menu"):
+			ui._show_context_menu(index, get_global_mouse_position())
+			accept_event()

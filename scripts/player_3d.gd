@@ -2,8 +2,6 @@ extends CharacterBody3D
 class_name Player3D
 ## 3D 俯视角玩家
 
-const EquipmentClass := preload("res://scripts/equipment.gd")
-
 # 动画状态
 enum AnimState { IDLE, RUN, JUMP, FALL }
 
@@ -46,6 +44,7 @@ func set_skin_path(path: String) -> void:
 func _ready() -> void:
 	_create_model()
 	_create_collision()
+	_create_inventory()
 	_create_lights_and_equipment()
 	_create_survival()
 	_setup_animations()
@@ -258,6 +257,18 @@ func _on_anim_finished(anim_name: String) -> void:
 
 
 # ═══════════════════════════════════════════
+# 背包（提前创建，装备管理器需要引用）
+# ═══════════════════════════════════════════
+
+func _create_inventory() -> void:
+	var InvScript := load("res://scripts/inventory/inventory.gd")
+	_inventory = Node.new()
+	_inventory.set_script(InvScript)
+	_inventory.name = "Inventory"
+	add_child(_inventory)
+
+
+# ═══════════════════════════════════════════
 # 装备系统
 # ═══════════════════════════════════════════
 
@@ -276,15 +287,12 @@ func _create_lights_and_equipment() -> void:
 	_equipment_mgr = Node.new()
 	_equipment_mgr.set_script(MgrScript)
 	_equipment_mgr.name = "EquipmentManager"
-	_equipment_mgr.setup(spot, omni)
+	_equipment_mgr.setup(spot, omni, _inventory)
 	add_child(_equipment_mgr)
-
-	_equipment_mgr.add_equipment(_make_flashlight())
-	_equipment_mgr.add_equipment(_make_torch())
 
 
 # ═══════════════════════════════════════════
-# 生存系统：血量 / 背包 / 近战
+# 生存系统：血量 / 近战
 # ═══════════════════════════════════════════
 
 func _create_survival() -> void:
@@ -296,25 +304,41 @@ func _create_survival() -> void:
 	add_child(_health)
 	_health.died.connect(_on_died)
 
-	var InvScript := load("res://scripts/inventory/inventory.gd")
-	_inventory = Node.new()
-	_inventory.set_script(InvScript)
-	_inventory.name = "Inventory"
-	add_child(_inventory)
-
 	var MeleeScript := load("res://scripts/combat/melee_controller.gd")
 	var melee := Node.new()
 	melee.set_script(MeleeScript)
 	melee.name = "MeleeController"
 	add_child(melee)
 
-	# 初始物资（用于验证各系统）
+	# 初始物资 → 先进背包再装备
 	var ItemDBScript := load("res://scripts/core/item_db.gd")
 	_inventory.add_item(ItemDBScript.get_item("wood"), 12)
 	_inventory.add_item(ItemDBScript.get_item("stone"), 8)
+
+	# 功能装备：手电筒、火把
+	var flashlight: Resource = ItemDBScript.get_item("flashlight")
+	if flashlight:
+		_inventory.add_item(flashlight, 1)
+		_equipment_mgr.equip_from_inventory(_find_inventory_slot("flashlight"))
+
+	var torch: Resource = ItemDBScript.get_item("torch")
+	if torch:
+		_inventory.add_item(torch, 1)
+		_equipment_mgr.equip_from_inventory(_find_inventory_slot("torch"))
+
+	# 武器：木剑
 	var sword: Resource = ItemDBScript.get_item("sword_wood")
 	if sword:
-		_equipment_mgr.add_equipment(sword)
+		_inventory.add_item(sword, 1)
+		_equipment_mgr.equip_from_inventory(_find_inventory_slot("sword_wood"))
+
+
+func _find_inventory_slot(item_id: String) -> int:
+	for i in range(_inventory.slots.size()):
+		var st = _inventory.get_stack(i)
+		if st and st.item.get("id") == item_id:
+			return i
+	return -1
 
 
 func get_health() -> Health:
@@ -342,45 +366,19 @@ func _on_died() -> void:
 		_anim_player.play(_anim_map["die"])
 
 
-func _make_flashlight() -> Resource:
-	var eq := EquipmentClass.new()
-	eq.set("id", "flashlight")
-	eq.set("display_name", "手电筒")
-	eq.set("light_type", EquipmentClass.LightType.SPOT)
-	eq.set("position_offset", Vector3(0, 1.0, -0.4))
-	eq.set("rotation_offset", Vector3(deg_to_rad(-20), 0, 0))
-	eq.set("spot_range", 50.0)
-	eq.set("spot_attenuation", 0.8)
-	eq.set("spot_angle", 65.0)
-	eq.set("light_color", Color(1.0, 0.95, 0.8))
-	eq.set("light_energy", 8.0)
-	eq.set("light_indirect_energy", 1.5)
-	eq.set("shadow_enabled", true)
-	eq.set("equipped", true)
-	return eq
-
-
-func _make_torch() -> Resource:
-	var eq := EquipmentClass.new()
-	eq.set("id", "torch")
-	eq.set("display_name", "火把")
-	eq.set("light_type", EquipmentClass.LightType.OMNI)
-	eq.set("position_offset", Vector3(0, 1.6, 0.3))
-	eq.set("omni_range", 6.0)
-	eq.set("omni_attenuation", 0.8)
-	eq.set("light_color", Color(1.0, 0.55, 0.15))
-	eq.set("light_energy", 5.0)
-	eq.set("light_indirect_energy", 1.0)
-	eq.set("shadow_enabled", false)
-	eq.set("equipped", true)
-	return eq
-
-
 func _input(event: InputEvent) -> void:
 	if _dead:
 		return
 	if event.is_action_pressed("cycle_equipment"):
-		_equipment_mgr.cycle_next()
+		_equipment_mgr.cycle_utility()
+	if event.is_action_pressed("cycle_weapon"):
+		_equipment_mgr.cycle_weapon()
+	if event.is_action_pressed("consume_1"):
+		_equipment_mgr.use_consumable(0)
+	if event.is_action_pressed("consume_2"):
+		_equipment_mgr.use_consumable(1)
+	if event.is_action_pressed("consume_3"):
+		_equipment_mgr.use_consumable(2)
 
 
 # ═══════════════════════════════════════════

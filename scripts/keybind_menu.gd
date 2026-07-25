@@ -9,7 +9,11 @@ const ACTIONS := [
 	{"id": "move_down",   "label": "后退",     "default": KEY_S},
 	{"id": "move_left",   "label": "左移",     "default": KEY_A},
 	{"id": "move_right",  "label": "右移",     "default": KEY_D},
-	{"id": "cycle_equipment",  "label": "切换装备", "default": KEY_F},
+	{"id": "cycle_equipment",  "label": "切换功能装备", "default": KEY_F},
+	{"id": "cycle_weapon",     "label": "切换武器",     "default": KEY_Q},
+	{"id": "consume_1",        "label": "消耗品栏位 1", "default": KEY_1},
+	{"id": "consume_2",        "label": "消耗品栏位 2", "default": KEY_2},
+	{"id": "consume_3",        "label": "消耗品栏位 3", "default": KEY_3},
 	{"id": "jump",        "label": "跳跃",     "default": KEY_SPACE},
 	{"id": "inventory_toggle", "label": "背包", "default": KEY_TAB},
 	{"id": "build_menu",  "label": "建造菜单", "default": KEY_B},
@@ -113,7 +117,7 @@ func _build_ui() -> void:
 	_root.add_child(bg)
 
 	_panel = Panel.new()
-	_panel.size = Vector2(400, 545)
+	_panel.size = Vector2(440, 520)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.12, 0.12, 0.14, 0.95)
 	style.border_width_bottom = 2; style.border_width_left = 2
@@ -124,49 +128,78 @@ func _build_ui() -> void:
 	_panel.add_theme_stylebox_override("panel", style)
 	_root.add_child(_panel)
 
+	# ── 标题 + 提示（固定在面板顶部）──
 	var title := Label.new()
 	title.text = "按键设置"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 24)
 	title.add_theme_color_override("font_color", Color.WHITE)
-	title.size = Vector2(400, 35)
+	title.size = Vector2(440, 35)
 	title.position = Vector2(0, 12)
 	_panel.add_child(title)
 
 	var hint := Label.new()
-	hint.text = "点击按键 → 按下新键 → 确认"
+	hint.text = "点击按键 → 按下新键 → 确认   滚轮滑动"
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.add_theme_color_override("font_color", Color(0.5, 0.5, 0.6))
-	hint.size = Vector2(400, 20)
+	hint.size = Vector2(440, 20)
 	hint.position = Vector2(0, 47)
 	_panel.add_child(hint)
 
-	var y := 75
+	# ── 滚动容器 ──
+	var scroll := ScrollContainer.new()
+	scroll.name = "ScrollContainer"
+	scroll.size = Vector2(440, 385)
+	scroll.position = Vector2(0, 72)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	var scroll_style := StyleBoxEmpty.new()
+	scroll.add_theme_stylebox_override("bg", scroll_style)
+	_panel.add_child(scroll)
+
+	# 边距包装
+	var margin := MarginContainer.new()
+	margin.name = "Margin"
+	margin.add_theme_constant_override("margin_left", 20)
+	margin.add_theme_constant_override("margin_right", 16)
+	margin.add_theme_constant_override("margin_top", 4)
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(margin)
+
+	# 内容容器
+	var content := VBoxContainer.new()
+	content.name = "Content"
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 8)
+	margin.add_child(content)
+
 	for action_info in ACTIONS:
 		var action_id: String = action_info.id
+
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 16)
+		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 		var name_label := Label.new()
 		name_label.text = action_info.label
 		name_label.add_theme_font_size_override("font_size", 15)
 		name_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.9))
-		name_label.size = Vector2(180, 30)
-		name_label.position = Vector2(25, y)
-		_panel.add_child(name_label)
+		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		row.add_child(name_label)
 
 		var key_btn := Button.new()
 		key_btn.text = _get_key_text(action_id)
-		key_btn.size = Vector2(130, 30)
-		key_btn.position = Vector2(230, y)
+		key_btn.custom_minimum_size = Vector2(130, 30)
 		key_btn.add_theme_font_size_override("font_size", 14)
 		key_btn.pressed.connect(_on_key_clicked.bind(action_id, key_btn))
-		_panel.add_child(key_btn)
+		row.add_child(key_btn)
 
 		_row_btns[action_id] = key_btn
-		y += 38
+		content.add_child(row)
 
-	# ── 按钮行 ──
-	var btn_y := y + 10
+	# ── 按钮行（固定在面板底部）──
+	var btn_y := 460
 	var reset_btn := Button.new()
 	reset_btn.text = "重置默认"
 	reset_btn.size = Vector2(110, 36)
@@ -178,7 +211,7 @@ func _build_ui() -> void:
 	var back_btn := Button.new()
 	back_btn.text = "← 返回"
 	back_btn.size = Vector2(110, 36)
-	back_btn.position = Vector2(250, btn_y)
+	back_btn.position = Vector2(290, btn_y)
 	back_btn.add_theme_font_size_override("font_size", 14)
 	back_btn.pressed.connect(hide)
 	_panel.add_child(back_btn)
@@ -233,6 +266,6 @@ func _layout_ui() -> void:
 	const REF: Vector2 = Vector2(1920.0, 1080.0)
 	var scale: float = clampf(minf(vs.x / REF.x, vs.y / REF.y), 0.6, 1.6)
 	_panel.scale = Vector2(scale, scale)
-	var pw: float = 400.0 * scale
-	var ph: float = 545.0 * scale
+	var pw: float = 440.0 * scale
+	var ph: float = 520.0 * scale
 	_panel.position = Vector2((vs.x - pw) / 2.0, (vs.y - ph) / 2.0)

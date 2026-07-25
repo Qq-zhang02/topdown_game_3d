@@ -14,5 +14,6 @@ has_projectile_vfx = true
 id = "sword_wood"
 display_name = "木剑"
 description = "简易的木制剑，聊胜于无"
+item_type = 2
 max_stack = 1
-ui_color = Color(0.72, 0.55, 0.3, 1)
+ui_color = Color(0.88235295, 0.70980394, 0.37254903, 1)

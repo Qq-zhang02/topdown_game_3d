@@ -1,13 +1,11 @@
-[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://bosqg0xv755n7"]
 
-[ext_resource type="Script" path="res://scripts/core/item_data.gd" id="1"]
+[ext_resource type="Script" uid="uid://bw1l50nd612bv" path="res://scripts/core/item_data.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
 id = "meat"
 display_name = "生肉"
 description = "猎杀动物获得的肉"
-item_type = 0
-max_stack = 99
 heal_amount = 15.0
-ui_color = Color(0.75, 0.3, 0.3, 1)
+ui_color = Color(0.9254902, 0.2784314, 0.30588236, 1)

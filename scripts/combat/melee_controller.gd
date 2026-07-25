@@ -52,9 +52,10 @@ func _ui_blocking() -> bool:
 func _get_weapon() -> Resource:
 	if _equipment_mgr == null:
 		return null
-	var eq = _equipment_mgr.get_current()
-	if eq != null and eq is WeaponDataClass:
-		return eq
+	if _equipment_mgr.has_method("get_current_weapon"):
+		var eq = _equipment_mgr.get_current_weapon()
+		if eq != null and eq is WeaponDataClass:
+			return eq
 	return null
 
 

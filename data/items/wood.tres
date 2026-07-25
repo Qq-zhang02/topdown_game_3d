@@ -1,12 +1,10 @@
-[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://c1jmeyjrkkwis"]
 
-[ext_resource type="Script" path="res://scripts/core/item_data.gd" id="1"]
+[ext_resource type="Script" uid="uid://bw1l50nd612bv" path="res://scripts/core/item_data.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
 id = "wood"
 display_name = "木材"
 description = "从树上砍下来的原木，基础建材"
-item_type = 0
-max_stack = 99
-ui_color = Color(0.62, 0.42, 0.2, 1)
+ui_color = Color(0.54901963, 0.38039216, 0.2, 1)

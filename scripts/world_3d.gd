@@ -659,13 +659,16 @@ func _create_equipment_hud(player_node: Node3D) -> void:
 # ═══════════════════════════════════════════
 
 func _create_inventory_ui() -> void:
+	var mgr: Node = _player.get_node_or_null("EquipmentManager")
 	var UIScript := load("res://scripts/inventory/inventory_ui.gd")
 	var ui := CanvasLayer.new()
 	ui.set_script(UIScript)
 	ui.name = "InventoryUI"
 	add_child(ui)
-	ui.setup(_player.get_inventory())
+	ui.setup(_player.get_inventory(), mgr)
 	ui.item_used.connect(_on_item_used)
+	if mgr and mgr.has_signal("consumable_used"):
+		mgr.consumable_used.connect(_on_consumable_used)
 
 
 func _on_item_used(item: Resource, _slot: int) -> void:
@@ -674,6 +677,10 @@ func _on_item_used(item: Resource, _slot: int) -> void:
 		var heal: float = item.get("heal_amount")
 		health.heal(heal)
 		_update_hp_bar()
+
+
+func _on_consumable_used(_slot: int, _heal_amount: float) -> void:
+	_update_hp_bar()
 
 
 # ═══════════════════════════════════════════
@@ -722,10 +729,10 @@ func _create_menu() -> void:
 	menu.set_keybind_menu(keybind)
 	# 改键时自动刷新装备栏的按键提示
 	var hud := get_node_or_null("HUDLayer/EquipmentHUD")
-	if hud and hud.has_method("refresh_key_label"):
-		keybind.bindings_changed.connect(hud.refresh_key_label)
+	if hud and hud.has_method("refresh_key_labels"):
+		keybind.bindings_changed.connect(hud.refresh_key_labels)
 		# 首次同步：KeybindMenu 加载保存的键位后，强制刷新装备栏标签
-		hud.refresh_key_label.call_deferred()
+		hud.refresh_key_labels.call_deferred()
 
 
 # ═══════════════════════════════════════════
@@ -995,15 +1002,15 @@ func _collect_player_data() -> Dictionary:
 			else:
 				inv_data.append(null)
 
-	# 装备
+	# 装备（新结构）
 	var equip_mgr: Node = _player.get_node_or_null("EquipmentManager")
-	var equip_idx: int = equip_mgr.get_current_index() if equip_mgr else -1
+	var equip_data: Dictionary = equip_mgr.get_save_data() if equip_mgr else {}
 
 	return {
 		"pos_x": pos.x, "pos_y": pos.y, "pos_z": pos.z,
 		"health": hp,
 		"inventory": inv_data,
-		"equipment_index": equip_idx,
+		"equipment": equip_data,
 	}
 
 
@@ -1113,12 +1120,14 @@ func _restore_from_save(data: Dictionary) -> void:
 			inv.changed.emit()
 			print("[World3D] 背包恢复: %d 项" % inv_arr.size())
 
-		# 装备
-		var equip_mgr: Node = _player.get_node_or_null("EquipmentManager")
-		if equip_mgr:
-			var idx: int = pd.get("equipment_index", 0)
-			equip_mgr.equip_index(idx)
-			print("[World3D] 装备恢复: index=%d" % idx)
+			# 装备
+			var equip_mgr: Node = _player.get_node_or_null("EquipmentManager")
+			if equip_mgr:
+				if pd.has("equipment"):
+					equip_mgr.restore_from_data(pd["equipment"])
+					print("[World3D] 装备恢复: 新格式")
+				elif pd.has("equipment_index"):
+					print("[World3D] 装备恢复: 旧存档格式，装备已重置（请在游戏中重新装备）")
 
 	# ── 世界状态 ──
 	var wd: Dictionary = data.get("world", {})
