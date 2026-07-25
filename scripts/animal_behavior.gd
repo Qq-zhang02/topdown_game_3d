@@ -9,8 +9,8 @@ class_name AnimalBehavior
 
 # ── 玩家推挤参数 ──
 @export var push_impulse_min: float = 1.5
-@export var push_impulse_max: float = 3.0
-@export var player_speed_factor: float = 0.12
+@export var push_impulse_max: float = 4.5
+@export var player_speed_factor: float = 10
 @export var push_cooldown: float = 0.25
 
 # ── 夜间狂暴参数 ──

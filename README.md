@@ -116,7 +116,7 @@ world_3d._ready()
 | `gravity` | 35.0 | 自定义重力（高于默认） |
 | `jump_velocity` | 15.0 | 跳跃初速度 |
 | `rotation_lag` | 0.0 | 转向迟滞（武器可加，最高 0.95） |
-| `vision_range` | 5.0 | 视力距离，瞄准时摄像机最大偏移量 |
+| `vision_range` | 6.0 | 视力距离，瞄准时摄像机最大偏移量 |
 
 **击中判定碰撞体：** `CapsuleShape3D`（radius=0.4, height=1.6），基于模型 AABB 自动适配。
 
@@ -136,11 +136,11 @@ var current_speed: float = speed * 0.25 if is_aiming() else speed
 
 **位置追踪**（松开右键时）
 - 摄像头位置偏离人物时触发
-- `速度 = POS_MIN_SPEED(0.5) + 距离 × POS_SPEED_FACTOR(2.0)`，越远越快
+- `速度 = POS_MIN_SPEED(0.1) + 距离 × POS_SPEED_FACTOR(2.0)`，越远越快
 
 **角度追踪**（松开右键时）
 - 摄像头未对准人物时触发，look_at 限幅 ±4°
-- `旋转速度 = LOOK_MIN_SPEED(0.3°/s) + 角度差 × LOOK_SPEED_FACTOR(1.0)`
+- `旋转速度 = LOOK_MIN_SPEED(0.2°/s) + 角度差 × LOOK_SPEED_FACTOR(1.0)`
 - 俯角与偏航分别独立计算，同样'偏离越大追越快'
 
 **瞄准**（按住右键时）
@@ -154,10 +154,10 @@ var current_speed: float = speed * 0.25 if is_aiming() else speed
 | `HEIGHT` | 10.0 | 摄像机距地面高度 |
 | `TILT_ANGLE` | 52° | 默认俯角 |
 | `FOV` | 60° | 透视投影 |
-| `POS_MIN_SPEED` | 0.5 | 位置最小追速（m/s） |
-| `POS_SPEED_FACTOR` | 2.0 | 位置追速系数（m/s/m） |
+| `POS_MIN_SPEED` | 0.1 | 位置最小追速（m/s） |
+| `POS_SPEED_FACTOR` | 1.0 | 位置追速系数（m/s/m） |
 | `LOOK_ANGLE_RANGE` | 4° | 角度最大偏离 |
-| `LOOK_MIN_SPEED` | 0.3°/s | 角度最小旋转速度 |
+| `LOOK_MIN_SPEED` | 0.2°/s | 角度最小旋转速度 |
 | `LOOK_SPEED_FACTOR` | 1.0 | 角度转速系数（°/s/°） |
 | `AIM_SPEED` | 8.0 | 瞄准偏移速度（m/s） |
 | `AIM_RETURN_SPEED` | 10.0 | 松开右键归位速度（m/s） |
@@ -516,8 +516,8 @@ ParticleProcessMaterial:
 
 动物不检测玩家碰撞（玩家 `collision_mask = 1`，动物在层 2），取而代之的是代码推挤：
 
-- 检测距离 0.6m
-- 推挤冲量：`push_impulse_min/max`（1.5~3.0），受玩家移速加成（×0.12）
+- 检测距离 0.6m （PUSH_DISTANCE）
+- 推挤冲量：`push_impulse_min/max`（1.5~4.5），受玩家移速加成（×10×(1.0 - dist / PUSH_DISTANCE)）
 - 推挤冷却：0.25s
 
 ---

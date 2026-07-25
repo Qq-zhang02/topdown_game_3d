@@ -14,7 +14,7 @@ var _skin_path: String = "res://models/character/colormap.png"
 @export var jump_velocity: float = 15.0
 @export var gravity: float = 35.0
 @export var rotation_lag: float = 0.0  # 转向迟滞，越高转向越笨重，最高加到0.95
-@export var vision_range: float = 5.0  # 视力属性，瞄准时摄像机最大偏移距离
+@export var vision_range: float = 6.0  # 视力属性，瞄准时摄像机最大偏移距离
 
 var _equipment_mgr: Node
 var _model_root: Node3D
@@ -441,7 +441,7 @@ func _physics_process(delta: float) -> void:
 		if is_on_wall() and not is_on_floor():
 			global_position.y -= STEP_HEIGHT
 			_step_fail_pos = global_position
-			_step_fail_cd = 0.2
+			_step_fail_cd = 0.3
 		else:
 			_step_fail_pos = Vector3.INF
 			_step_fail_cd = 0.0
