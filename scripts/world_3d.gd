@@ -25,6 +25,7 @@ var _loading_save: bool = false               # 是否正在加载存档（跳�
 var _resource_positions: Array[Dictionary] = []  # 资源节点位置存档 [{kind, pos_x, pos_z}]
 var _regen_timer: float = 0.0                    # 资源重生计时器
 var _animal_regen_timer: float = 0.0              # 动物重生计时器
+var _terrain_max_y: float = 0.0                   # 地形最高点 Y（用于初始站位估算）
 
 
 func _ready() -> void:
@@ -147,30 +148,100 @@ func _create_lighting() -> void:
 # ═══════════════════════════════════════════
 
 func _create_ground() -> void:
-	var total_size := WORLD_HALF * 2.0
+	const TERRAIN_PATH := "res://models/landscape/地形.glb"
+	if not ResourceLoader.exists(TERRAIN_PATH):
+		# 回退：程序化地面
+		var total_size := WORLD_HALF * 2.0
+		var ground := MeshInstance3D.new()
+		ground.name = "Ground"
+		var plane := PlaneMesh.new()
+		plane.size = Vector2(total_size, total_size)
+		ground.mesh = plane
+		var mat := StandardMaterial3D.new()
+		mat.albedo_texture = _make_terrain_texture()
+		mat.roughness = 0.9
+		mat.metallic = 0.0
+		ground.material_override = mat
+		add_child(ground)
+		var body := StaticBody3D.new()
+		body.name = "GroundBody"
+		body.collision_layer = 1
+		var col := CollisionShape3D.new()
+		var shape := BoxShape3D.new()
+		shape.size = Vector3(total_size, 0.05, total_size)
+		col.shape = shape
+		col.position = Vector3(0, -0.025, 0)
+		body.add_child(col)
+		add_child(body)
+		return
 
-	var ground := MeshInstance3D.new()
-	ground.name = "Ground"
-	var plane := PlaneMesh.new()
-	plane.size = Vector2(total_size, total_size)
-	ground.mesh = plane
-	var mat := StandardMaterial3D.new()
-	mat.albedo_texture = _make_terrain_texture()
-	mat.roughness = 0.9
-	mat.metallic = 0.0
-	ground.material_override = mat
-	add_child(ground)
+	var scene: PackedScene = load(TERRAIN_PATH)
+	var terrain: Node3D = scene.instantiate()
+	terrain.name = "Terrain"
+	terrain.position = Vector3.ZERO
+	add_child(terrain)
 
+	# 计算地形整体 AABB
+	var aabb := AABB()
+	for mi in terrain.find_children("*", "MeshInstance3D", true, false):
+		var m: MeshInstance3D = mi
+		if m.mesh:
+			var local_aabb := m.mesh.get_aabb()
+			var global_aabb := m.global_transform * local_aabb
+			if aabb.size.length_squared() < 0.01:
+				aabb = global_aabb
+			else:
+				aabb = aabb.merge(global_aabb)
+
+	# 将地形最低点沉到 y=0，中心对齐世界原点
+	terrain.position = Vector3(-aabb.get_center().x, -aabb.position.y, -aabb.get_center().z)
+
+	# 缩放地形使其 XZ 覆盖世界范围
+	var terrain_xz := maxf(aabb.size.x, aabb.size.z)
+	var target_xz := WORLD_HALF * 2.0
+	var scale_factor := 1.0
+	if terrain_xz > 0.01 and terrain_xz < target_xz:
+		scale_factor = target_xz / terrain_xz
+		terrain.scale = Vector3(scale_factor, 1.0, scale_factor)
+		print("[World3D] 地形缩放: %.1f → %.1f (×%.2f)" % [terrain_xz, target_xz, scale_factor])
+
+	# 手动创建碰撞体（从 mesh face 构建，放在世界根下避免变换继承问题）
 	var body := StaticBody3D.new()
-	body.name = "GroundBody"
+	body.name = "TerrainBody"
 	body.collision_layer = 1
-	var col := CollisionShape3D.new()
-	var shape := BoxShape3D.new()
-	shape.size = Vector3(total_size, 0.05, total_size)
-	col.shape = shape
-	col.position = Vector3(0, -0.025, 0)
-	body.add_child(col)
 	add_child(body)
+
+	var mesh_count := 0
+	for mi in terrain.find_children("*", "MeshInstance3D", true, false):
+		if mi.mesh and mi.mesh.get_faces().size() > 0:
+			var col := CollisionShape3D.new()
+			var shape := ConcavePolygonShape3D.new()
+			shape.set_faces(mi.mesh.get_faces())
+			col.shape = shape
+			# 用全局变换：terrain.position/scale/rotation × mesh 局部变换
+			col.global_transform = terrain.global_transform * mi.transform
+			body.add_child(col)
+			mesh_count += 1
+
+	print("[World3D] 地形加载完成, %d 个碰撞体, 缩放=%.1f, AABB=%s" % [mesh_count, scale_factor, aabb.size])
+
+
+## 公开接口：获取地形表面高度（供建造等外部系统使用）
+func get_terrain_height_at(x: float, z: float) -> float:
+	return _get_terrain_height(x, z)
+
+
+## 射线检测地表高度（从上方 100m 向下射）
+func _get_terrain_height(x: float, z: float) -> float:
+	var space := get_world_3d().direct_space_state
+	var from := Vector3(x, 100.0, z)
+	var to := Vector3(x, -100.0, z)
+	var query := PhysicsRayQueryParameters3D.create(from, to)
+	query.collision_mask = 1  # 地面/障碍物层
+	var result := space.intersect_ray(query)
+	if not result.is_empty():
+		return result.position.y
+	return 0.0
 
 
 func _make_terrain_texture() -> Texture2D:
@@ -238,11 +309,9 @@ func _create_obstacles() -> void:
 		var d: float = rng.randf_range(1.0, 4.0)
 		var h: float = rng.randf_range(1.5, 5.0)
 
-		var pos := Vector3(
-			rng.randf_range(margin, WORLD_HALF * 2 - margin) - WORLD_HALF,
-			h / 2.0,
-			rng.randf_range(margin, WORLD_HALF * 2 - margin) - WORLD_HALF
-		)
+		var pos_x := rng.randf_range(margin, WORLD_HALF * 2 - margin) - WORLD_HALF
+		var pos_z := rng.randf_range(margin, WORLD_HALF * 2 - margin) - WORLD_HALF
+		var pos := Vector3(pos_x, _get_terrain_height(pos_x, pos_z) + h / 2.0, pos_z)
 
 		var mat_idx: int = 0
 		var roll: float = rng.randf()
@@ -303,11 +372,9 @@ func _create_resource_nodes() -> void:
 			var pos := Vector3.ZERO
 			var found := false
 			for attempt in range(60):
-				pos = Vector3(
-					rng.randf_range(-WORLD_HALF + 4.0, WORLD_HALF - 4.0),
-					0,
-					rng.randf_range(-WORLD_HALF + 4.0, WORLD_HALF - 4.0)
-				)
+				var rx := rng.randf_range(-WORLD_HALF + 4.0, WORLD_HALF - 4.0)
+				var rz := rng.randf_range(-WORLD_HALF + 4.0, WORLD_HALF - 4.0)
+				pos = Vector3(rx, _get_terrain_height(rx, rz), rz)
 				if is_area_free(pos, Vector2(1.0, 1.0)) and pos.distance_to(_player.global_position) > 6.0:
 					found = true
 					break
@@ -323,7 +390,9 @@ func _spawn_resources_from_save() -> void:
 	var ResNodeScript := load("res://scripts/world/resource_node.gd")
 	for r in _resource_positions:
 		var kind: String = r.get("kind", "tree")
-		var pos := Vector3(r.get("pos_x", 0.0), 0.0, r.get("pos_z", 0.0))
+		var sx := r.get("pos_x", 0.0) as float
+		var sz := r.get("pos_z", 0.0) as float
+		var pos := Vector3(sx, _get_terrain_height(sx, sz), sz)
 		if is_area_free(pos, Vector2(1.0, 1.0)):
 			var node = ResNodeScript.spawn(self, kind, pos)
 			register_occupied(node.occupied_aabb)
@@ -348,11 +417,9 @@ func _try_regen_resource() -> void:
 	var ResNodeScript := load("res://scripts/world/resource_node.gd")
 
 	for attempt in range(30):
-		var pos := Vector3(
-			rng.randf_range(-WORLD_HALF + 4.0, WORLD_HALF - 4.0),
-			0,
-			rng.randf_range(-WORLD_HALF + 4.0, WORLD_HALF - 4.0)
-		)
+		var rx := rng.randf_range(-WORLD_HALF + 4.0, WORLD_HALF - 4.0)
+		var rz := rng.randf_range(-WORLD_HALF + 4.0, WORLD_HALF - 4.0)
+		var pos := Vector3(rx, _get_terrain_height(rx, rz), rz)
 		if not _player or pos.distance_to(_player.global_position) < 8.0:
 			continue
 		if is_area_free(pos, Vector2(1.0, 1.0)):
@@ -401,11 +468,9 @@ func _spawn_single_animal() -> void:
 	var pos: Vector3
 	var found := false
 	for attempt in range(30):
-		pos = Vector3(
-			rng.randf_range(-WORLD_HALF + 4.0, WORLD_HALF - 4.0),
-			0,
-			rng.randf_range(-WORLD_HALF + 4.0, WORLD_HALF - 4.0)
-		)
+		var ax := rng.randf_range(-WORLD_HALF + 4.0, WORLD_HALF - 4.0)
+		var az := rng.randf_range(-WORLD_HALF + 4.0, WORLD_HALF - 4.0)
+		pos = Vector3(ax, 50.0, az)
 		if _player and pos.distance_to(_player.global_position) < 10.0:
 			continue
 		if is_area_free(pos, Vector2(1.0, 1.0)):
@@ -451,9 +516,6 @@ func _spawn_single_animal() -> void:
 	col.shape = shape
 	col.position = Vector3(0, shape.height * 0.5, 0)
 	body.add_child(col)
-
-	for mesh: MeshInstance3D in model_root.find_children("*", "MeshInstance3D", true, false):
-		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 	var BehaviorScript := load("res://scripts/animal_behavior.gd")
 	var behavior := Node.new()
@@ -574,7 +636,7 @@ func _create_player(model_path: String, skin_path: String) -> void:
 	var ps := load("res://scenes/player.tscn")
 	_player = ps.instantiate() as CharacterBody3D
 	_player.name = "Player"
-	_player.position = Vector3(0, 0, 0)
+	_player.position = Vector3(0, 50.0, 0)  # 从高处落下，重力自动着陆地形
 	_player.set_model_path(model_path)
 	_player.set_skin_path(skin_path)
 	_player.collision_mask = 1  # 只与地面/障碍物碰撞

@@ -115,7 +115,7 @@ func _process(_delta: float) -> void:
 	var target: Vector3 = _player.get_mouse_ground_position()
 	target.x = roundf(target.x / GRID) * GRID
 	target.z = roundf(target.z / GRID) * GRID
-	target.y = _current.size.y * 0.5
+	target.y = _world.get_terrain_height_at(target.x, target.z) + _current.size.y * 0.5
 	_ghost_pos = target
 
 	_ghost.position = target

@@ -35,6 +35,7 @@ func _ready() -> void:
 		scene.queue_free()
 
 	_beam.name = "BeamMesh"
+	_beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_beam)
 
 	var base_mat := _beam.get_active_material(0)
@@ -59,11 +60,11 @@ func _ready() -> void:
 					if ("hand" in bone_name or "arm" in bone_name) and ("l" in bone_name or "left" in bone_name):
 						var pose: Transform3D = skel.get_bone_global_pose(bone_idx)
 						var bone_global: Vector3 = skel.global_transform * pose.origin
-						position = parent.to_local(bone_global) + Vector3(-0.2, -0.2, -0.3) #相对左手骨骼偏移
+						position = parent.to_local(bone_global) + Vector3(-0.2, -0.3, -0.5) #相对左手骨骼偏移
 						found_hand = true
 						break
 	if not found_hand:
-		position = Vector3(0, 1.2, -0.4)
+		position = Vector3(0, 0.8, -0.7)
 
 	visible = false
 
@@ -92,6 +93,7 @@ func _gradient_tex(c1: Color, c2: Color) -> GradientTexture1D:
 func _setup_side_splash() -> void:
 	_side_splash = GPUParticles3D.new()
 	_side_splash.name = "SideSplash"
+	_side_splash.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_side_splash.one_shot = false
 	_side_splash.emitting = false
 	_side_splash.amount = 80
@@ -121,6 +123,7 @@ func _setup_side_splash() -> void:
 func _setup_impact_burst() -> void:
 	_impact_burst = GPUParticles3D.new()
 	_impact_burst.name = "ImpactBurst"
+	_impact_burst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_impact_burst.one_shot = true
 	_impact_burst.emitting = false
 	_impact_burst.amount = 40

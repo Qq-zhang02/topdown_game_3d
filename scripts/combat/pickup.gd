@@ -67,11 +67,18 @@ func _build() -> void:
 
 	_base_y = position.y
 
+	# 探测地表高度作为落地目标
+	var space := get_world_3d().direct_space_state
+	var q := PhysicsRayQueryParameters3D.create(Vector3(position.x, 100.0, position.z), Vector3(position.x, -100.0, position.z))
+	q.collision_mask = 1
+	var hit := space.intersect_ray(q)
+	var ground_y: float = hit.position.y if not hit.is_empty() else 0.2
+
 	# 掉落动画：先禁用拾取，落地弹跳+滑行后才可拾取
 	area.monitoring = false
 	var tween := create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(self, "position:y", 0.2, 0.6).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(self, "position:y", ground_y + 0.2, 0.6).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
 	var slide_x := randf_range(-0.8, 0.8)
 	var slide_z := randf_range(-0.8, 0.8)
 	tween.tween_property(self, "position:x", position.x + slide_x, 0.6).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)

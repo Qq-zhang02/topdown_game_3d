@@ -1,4 +1,4 @@
-# TopDownGame3D v3.4.0
+# TopDownGame3D v3.4.1
 
 > Godot 4.7.1 · 俯视角 3D · 全 GDScript · 2026-07-26
 
@@ -63,7 +63,10 @@ topdown_game_3d-v3/
 │   ├── save_manager.gd           # ★ 存档管理器：5槽位，JSON读写，可自定义路径
 │   ├── save_select_screen.gd     # ★ 存档选择界面：3D预览+动画预览+新建/进入/删除
 │   ├── start_screen.gd / menu_manager.gd / keybind_menu.gd / time_display.gd
-└── models/                    # 角色 + 24种动物 GLB
+└── models/
+    ├── landscape/地形.glb     # ★ 地形模型（起伏表面，运行时自动居中缩放+碰撞生成）
+    ├── character/             # 角色模型
+    └── animals/               # 24 种动物 GLB
 ```
 
 ---
@@ -205,11 +208,33 @@ var current_speed: float = speed * 0.25 if is_aiming() else speed
 
 发光建筑放置时自动添加 OmniLight3D 子节点，位置在建筑顶部以上 0.6m。
 
+### 地形系统（v3.4.1+）
+
+**文件：** `scripts/world_3d.gd` — `_create_ground()` / `_get_terrain_height()`
+
+地形由 `models/landscape/地形.glb` GLB 模型驱动，运行时自动适配：
+
+| 步骤 | 说明 |
+|------|------|
+| 加载模型 | 从 `地形.glb` instantiate，遍历所有 `MeshInstance3D` 计算整体 AABB |
+| 自动居中 | 地形最低点沉到 y=0，XZ 居中对齐世界原点 |
+| 自动缩放 | XZ 轴等比缩放到 `WORLD_HALF × 2`（100×100），Y 轴保持不变 |
+| 碰撞生成 | 从每个 mesh 提取 face 数据，用 `global_transform` 计算世界空间 `ConcavePolygonShape3D`，挂载在独立 `StaticBody3D` 下 |
+| 高度查询 | `get_terrain_height_at(x, z)` 射线检测地表，供建造/放置使用 |
+
+**对象适配**：
+- 玩家 / 动物 — 从 y=50 高处出生，重力自动着陆
+- 掉落物 — 生成时射线检测地表，tween 弹跳到 `地表 + 0.2m`
+- 建筑 — 幽灵预览和放置均通过 `get_terrain_height_at()` 贴合地表
+- 障碍物 / 资源节点 — 生成时射线检测地表高度
+
+**回退机制**：`地形.glb` 不存在时自动回退到程序化 `PlaneMesh` + 噪声纹理地面。
+
 ### 世界范围
 
 | 参数 | 值 | 说明 |
 |------|-----|------|
-| `WORLD_HALF` | 50.0 | 世界半径（总大小 100×100） |
+| `WORLD_HALF` | 50.0 | 世界半径（总大小 100×100），地形自动缩放填满 |
 | 障碍物 | 100 个 | 随机位置/尺寸（1~4m 宽，1.5~5m 高），固定种子 42 |
 | 地图边界 | ±WORLD_HALF | 超出边界 → 落入岩浆，60HP/s 持续掉血 |
 

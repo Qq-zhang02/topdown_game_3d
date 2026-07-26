@@ -42,7 +42,7 @@ func spawn_all() -> void:
 		while attempts < 50 and not found:
 			pos = Vector3(
 				rng.randf_range(-_world_half + spawn_margin, _world_half - spawn_margin),
-				0,
+				50.0,
 				rng.randf_range(-_world_half + spawn_margin, _world_half - spawn_margin)
 			)
 			if _is_position_clear(pos) and pos.distance_to(_player_pos) > 5.0:
@@ -102,10 +102,6 @@ func _spawn_animal(model_name: String, pos: Vector3, scale_val: float, rot_y: fl
 	col.shape = shape
 	col.position = Vector3(0, shape.height * 0.5, 0)
 	body.add_child(col)
-
-	# 关阴影
-	for mesh: MeshInstance3D in model_root.find_children("*", "MeshInstance3D", true, false):
-		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 	# 挂载随机弹跳行为
 	var BehaviorScript := load("res://scripts/animal_behavior.gd")

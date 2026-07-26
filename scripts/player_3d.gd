@@ -66,7 +66,6 @@ func _create_model() -> void:
 	_model_root.name = "CharacterModel"
 	add_child(_model_root)
 
-	_set_shadow_recursive(_model_root)
 	_apply_skin(_model_path)
 
 	var aabb := _get_model_aabb(_model_root)
@@ -92,13 +91,6 @@ func _get_model_aabb(node: Node3D) -> AABB:
 			else:
 				aabb = aabb.merge(global_aabb)
 	return aabb
-
-
-func _set_shadow_recursive(node: Node) -> void:
-	if node is GeometryInstance3D:
-		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	for child in node.get_children():
-		_set_shadow_recursive(child)
 
 
 ## 为 FBX 模型（无内嵌贴图）应用皮肤纹理
@@ -385,7 +377,7 @@ func _input(event: InputEvent) -> void:
 # 移动 + 跳跃 + 朝向
 # ═══════════════════════════════════════════
 
-## 获取鼠标指向的地面世界坐标（XZ 平面）
+## 获取鼠标指向的地面世界坐标
 func get_mouse_ground_position() -> Vector3:
 	var camera: Camera3D = get_viewport().get_camera_3d()
 	if not camera:
@@ -395,9 +387,17 @@ func get_mouse_ground_position() -> Vector3:
 	var from: Vector3 = camera.project_ray_origin(mouse_pos)
 	var ray_dir: Vector3 = camera.project_ray_normal(mouse_pos)
 
+	# 先尝试射线检测地形碰撞（层 1 = 地面/障碍物）
+	var space := get_world_3d().direct_space_state
+	var query := PhysicsRayQueryParameters3D.create(from, from + ray_dir * 200.0)
+	query.collision_mask = 1
+	var result := space.intersect_ray(query)
+	if not result.is_empty():
+		return result.position
+
+	# 回退：平面相交
 	var ground_plane := Plane(Vector3.UP, 0.0)
 	var hit: Variant = ground_plane.intersects_ray(from, ray_dir)
-
 	if hit is Vector3:
 		return hit
 	return global_position
