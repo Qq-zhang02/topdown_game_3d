@@ -106,8 +106,15 @@ func _on_game_started(model_path: String, skin_path: String, save_slot: int) -> 
 	_create_save_toast()
 	# 加载存档时跳过初始保存（_restore_from_save 最后会保存）
 	if not _loading_save:
-		_save_current_game.call_deferred()
+		# 等资源节点等异步生成完成后保存，确保存档包含初始树/石头
+		_initial_save_after_world_ready()
 	_loading_save = false
+
+
+## 初始存档：等世界生成（含异步资源生成）完成后再写入
+func _initial_save_after_world_ready() -> void:
+	await get_tree().create_timer(0.15).timeout
+	_save_current_game()
 
 
 # ═══════════════════════════════════════════
@@ -299,6 +306,8 @@ func _create_lava() -> void:
 # ═══════════════════════════════════════════
 
 func _create_obstacles() -> void:
+	# 等一帧，让地形碰撞体注册到物理空间后再射线检测高度
+	await get_tree().physics_frame
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 42
 	var margin: float = 5.0
@@ -362,6 +371,8 @@ func _make_material_presets() -> Array[StandardMaterial3D]:
 # ═══════════════════════════════════════════
 
 func _create_resource_nodes() -> void:
+	# 等一帧，让地形碰撞体注册到物理空间后再射线检测高度
+	await get_tree().physics_frame
 	var ResNodeScript := load("res://scripts/world/resource_node.gd")
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()

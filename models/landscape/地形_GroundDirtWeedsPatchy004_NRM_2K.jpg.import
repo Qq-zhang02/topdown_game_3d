@@ -2,7 +2,7 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cdva2ys4ui8tq"
+uid="uid://66wmk71l5hyc"
 path.s3tc="res://.godot/imported/地形_GroundDirtWeedsPatchy004_NRM_2K.jpg-4e01415a47dd4adef6f359e6b5c81e86.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
@@ -29,8 +29,8 @@ compress/normal_map=1
 compress/channel_pack=0
 mipmaps/generate=true
 mipmaps/limit=-1
-roughness/mode=0
-roughness/src_normal=""
+roughness/mode=1
+roughness/src_normal="res://models/landscape/地形_GroundDirtWeedsPatchy004_NRM_2K.jpg"
 process/channel_remap/red=0
 process/channel_remap/green=1
 process/channel_remap/blue=2
