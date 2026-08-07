@@ -1,4 +1,4 @@
-# TopDownGame3D v3.4.1
+# TopDownGame3D v3.4.2
 
 > Godot 4.7.1 · 俯视角 3D · 全 GDScript · 2026-07-26
 
@@ -552,7 +552,24 @@ ParticleProcessMaterial:
 
 ## 8. 昼夜与夜间狂暴
 
-昼夜系统 60 倍速（现实 1 分钟 = 游戏 1 小时），24 分钟一天。
+**文件：** `scripts/day_night_cycle.gd`（`class_name DayNightCycle`）
+
+### 时间模型（v3.4.2+ 重构）
+
+时间以**归一化进度** `day_progress`（0.0~1.0）记录：`0.0 = 0:00`、`0.25 = 6:00`、`0.5 = 12:00`。24h 制时钟由进度推导（`day_progress × 24`），**与总时长完全解耦**。
+
+**★ 一天总时长单点配置**（`day_night_cycle.gd` 顶部）：
+
+```gdscript
+@export var seconds_per_day: float = 480.0  # 480 = 8分钟一天
+```
+
+调整该值即可改变白天/夜晚总时长，时钟显示、存档、动物昼夜行为自动适配，不会出错。默认 **8 分钟一天**。
+
+### 存档兼容
+
+- 新存档：保存 `day_progress`（归一化进度，与总时长无关）
+- 旧存档自动迁移：检测到旧字段 `day_time`（绝对游戏秒）时换算为进度后恢复
 
 ### 夜间 (19:00 ~ 6:00)
 

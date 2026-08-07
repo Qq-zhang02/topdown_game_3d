@@ -820,7 +820,7 @@ func _create_day_night_system() -> void:
 	_day_night.set("sun_light", $SunLight)
 	_day_night.set("moon_light", $MoonLight)
 	_day_night.set("environment", $WorldEnv.environment)
-	_day_night.set("time_scale", 60.0)
+	# 一天总时长在 scripts/day_night_cycle.gd 的 seconds_per_day 处统一配置
 	_day_night.add_to_group("day_night_system")
 	add_child(_day_night)
 
@@ -1088,9 +1088,10 @@ func _collect_player_data() -> Dictionary:
 
 
 func _collect_world_data() -> Dictionary:
-	var day_time: float = 0.25
-	if _day_night and _day_night.get("game_time") != null:
-		day_time = float(_day_night.get("game_time"))
+	# 归一化进度（0~1），与总时长无关，改 seconds_per_day 不影响存档
+	var day_progress: float = 0.25
+	if _day_night and _day_night.get("day_progress") != null:
+		day_progress = float(_day_night.get("day_progress"))
 
 	var buildings: Array[Dictionary] = []
 	for b in _buildings_data:
@@ -1107,7 +1108,7 @@ func _collect_world_data() -> Dictionary:
 			animal_count += 1
 
 	return {
-		"day_time": day_time,
+		"day_progress": day_progress,
 		"buildings": buildings,
 		"resources": _resource_positions,
 		"animal_count": animal_count,
@@ -1205,10 +1206,15 @@ func _restore_from_save(data: Dictionary) -> void:
 	# ── 世界状态 ──
 	var wd: Dictionary = data.get("world", {})
 
-	# 昼夜时间
-	if _day_night and wd.has("day_time"):
-		_day_night.set("game_time", float(wd["day_time"]))
-		print("[World3D] 昼夜恢复: ", wd["day_time"])
+	# 昼夜时间（归一化进度 0~1）
+	if _day_night and wd.has("day_progress"):
+		_day_night.set("day_progress", float(wd["day_progress"]))
+		print("[World3D] 昼夜恢复: progress=", wd["day_progress"])
+	elif _day_night and wd.has("day_time"):
+		# 旧存档兼容：day_time 是绝对游戏秒（0~86400），换算成进度
+		var old_progress: float = clampf(float(wd["day_time"]) / 86400.0, 0.0, 1.0)
+		_day_night.set("day_progress", old_progress)
+		print("[World3D] 昼夜恢复(旧存档): progress=", old_progress)
 
 	# 资源节点：用存档位置取代随机生成
 	var resources: Array = wd.get("resources", [])

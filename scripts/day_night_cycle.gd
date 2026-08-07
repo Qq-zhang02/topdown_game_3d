@@ -1,14 +1,18 @@
 extends Node
 class_name DayNightCycle
 ## 昼夜循环系统：24小时模拟，太阳/月亮/环境光渐变
+##
+## ★ 时间以「归一化进度 day_progress」记录（0.0~1.0），24h 制时钟由进度推导。
+##   这样调整 seconds_per_day 改变一天总时长时，时钟显示与存档都自动保持正确。
 
-const SECONDS_PER_DAY: float = 86400.0  # 24h in seconds
 const DAWN_HOUR: float = 6.0             # 6:00 黎明
 const DUSK_HOUR: float = 18.0            # 18:00 黄昏
 
-# 游戏中 1 秒 = 多少游戏分钟（60 = 1秒1小时 → 24秒一天）
-@export var time_scale: float = 60.0
-var game_time: float = 21600.0  # 从早上 6:00 开始
+## ★ 一天（白天+夜晚）的真实秒数 —— 唯一的时长配置点，改这里即可
+@export var seconds_per_day: float = 480.0  # 480 = 8分钟一天
+
+## 归一化进度：0.0 = 0:00, 0.25 = 6:00, 0.5 = 12:00, 1.0 = 24:00
+var day_progress: float = 0.25  # 从早上 6:00 开始
 
 var sun_light: DirectionalLight3D
 var moon_light: DirectionalLight3D
@@ -16,17 +20,17 @@ var environment: Environment
 
 
 func _process(delta: float) -> void:
-	game_time += delta * time_scale
-	if game_time >= SECONDS_PER_DAY:
-		game_time -= SECONDS_PER_DAY
+	if seconds_per_day > 0.0:
+		day_progress = fmod(day_progress + delta / seconds_per_day, 1.0)
 
 	_update_sun()
 	_update_moon()
 	_update_ambient()
 
 
+## 24h 制时钟小时（0~24，由进度相对推导，与总时长无关）
 func get_time_hours() -> float:
-	return game_time / 3600.0
+	return day_progress * 24.0
 
 
 # ═══════════════════════════════════════════
