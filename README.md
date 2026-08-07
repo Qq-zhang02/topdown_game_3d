@@ -41,32 +41,41 @@ topdown_game_3d-v3/
 │   ├── combat/
 │   │   ├── health.gd          # 通用血量组件（受击红闪+溅射粒子，自动覆盖所有挂载者）
 │   │   ├── melee_controller.gd# 近战：左键扇形判定，伤害取自当前 WeaponData
-│   │   └── pickup.gd          # 掉落物：上抛弹跳→滑行→可拾取，触发后飞向角色消失
+│   │   └── pickup.gd          # 掉落物：上抛弹跳→滑行→可拾取，射线贴合地形，飞向角色消失
 │   ├── building/
 │   │   ├── building_data.gd   # 建筑定义：尺寸/颜色/材料消耗/发光
-│   │   ├── build_controller.gd# 建造模式：幽灵预览(绿/红)+网格吸附+R旋转
+│   │   ├── build_controller.gd# 建造模式：幽灵预览(绿/红)+网格吸附+R旋转，贴合地形高度
 │   │   └── build_menu_ui.gd   # 建造菜单：配方列表，材料不足置灰
 │   ├── world/
-│   │   ├── lava.gd           # 岩浆：滚动熔岩表面，越界落入岩浆持续掉血
+│   │   ├── lava.gd            # 岩浆：滚动熔岩表面，越界落入岩浆持续掉血
 │   │   ├── resource_node.gd   # 可采集资源：树(掉木材)/石头(掉石头)
 │   │   └── death_screen.gd    # 死亡界面 → 回开始界面
 │   ├── items/
 │   │   └── weapon_data.gd     # 近战武器数据（继承 ItemData）
-│   ├── world_3d.gd            # 世界总管（占地登记/建造放置/各系统组装）
+│   ├── vfx/
+│   │   └── thrust_beam_vfx.gd # 突刺光束 VFX：光束+溅射粒子+尖端爆开（0.2s 时序）
+│   ├── world_3d.gd            # 世界总管（占地登记/建造放置/地形加载/各系统组装）
 │   ├── player_3d.gd           # 玩家：移动/朝向(反应速度阻尼)/装备/血量/背包/近战/动画
 │   ├── equipment.gd           # 光源装备（继承 ItemData：手电筒/火把）
 │   ├── equipment_manager.gd   # 装备管理器：功能装备(F)/武器(Q)/消耗品(1/2/3) 三区管理，冷却系统
 │   ├── equipment_hud.gd       # 底部装备栏：三区布局 + 冷却覆盖动画
-│   ├── camera_follow_3d.gd / minimap_3d.gd / day_night_cycle.gd
+│   ├── camera_follow_3d.gd    # 摄像机：位置/角度偏差驱动追踪 + 瞄准偏移
+│   ├── minimap_3d.gd          # 小地图（左上角 220×220，障碍物+动物渲染）
+│   ├── day_night_cycle.gd     # ★ 昼夜循环：day_progress 归一化进度，seconds_per_day 单点配置
 │   ├── animal_spawner.gd      # 动物生成（+血量/掉落生肉）
-│   ├── animal_behavior.gd     # 动物行为
-│   ├── save_manager.gd           # ★ 存档管理器：5槽位，JSON读写，可自定义路径
-│   ├── save_select_screen.gd     # ★ 存档选择界面：3D预览+动画预览+新建/进入/删除
+│   ├── animal_behavior.gd     # 动物行为（弹跳/夜间狂暴/玩家推挤）
+│   ├── save_manager.gd        # ★ 存档管理器：5槽位，JSON读写，可自定义路径
+│   ├── save_select_screen.gd  # ★ 存档选择界面：3D预览+动画预览+新建/进入/删除
 │   ├── start_screen.gd / menu_manager.gd / keybind_menu.gd / time_display.gd
+├── shaders/
+│   └── thrust_beam.gdshader   # 突刺光束着色器（前缘生长+噪声流动+Fresnel淡出）
 └── models/
-    ├── landscape/地形.glb     # ★ 地形模型（起伏表面，运行时自动居中缩放+碰撞生成）
-    ├── character/             # 角色模型
-    └── animals/               # 24 种动物 GLB
+    ├── landscape/             # ★ 地形模型 + 贴图 + Blender 源文件
+    │   ├── 地形.glb / 地形.blend
+    │   └── 地形_*_2K.jpg/png（COL 漫反射 / NRM 法线 / REFL+GLOSS 反射光泽）
+    ├── character/             # 角色模型 + colormap.png 皮肤
+    ├── animals/               # 24 种动物 GLB + Textures/colormap.png
+    └── vfx/ThrustBeam.glb     # 突刺光束模型（锥形能量柱）
 ```
 
 ---
