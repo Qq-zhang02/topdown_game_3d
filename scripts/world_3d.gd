@@ -170,8 +170,12 @@ func _create_ground() -> void:
 			var shape := ConcavePolygonShape3D.new()
 			shape.set_faces(mi.mesh.get_faces())
 			col.shape = shape
-			col.global_transform = mi.global_transform
+			# ★ 先 add_child 再加入树，再设 global_transform：
+			#   父节点（TerrainBody/Terrain wrapper）可能非恒等变换，
+			#   无父节点时 set_global_transform 会直接把世界变换当本地变换存，
+			#   导致父变换二次叠加、碰撞体偏离渲染地形。
 			body_node.add_child(col)
+			col.global_transform = mi.global_transform
 			mesh_count += 1
 
 	print("[World3D] 地形碰撞构建完成: %d 个碰撞体" % mesh_count)
@@ -590,6 +594,9 @@ func place_building(data: Resource, pos: Vector3, rot_y: float, from_save: bool 
 			"rot_y": rot_y
 		})
 
+	# ★ 尺寸由预制体 mesh AABB 决定（.tres 不保存尺寸）
+	var bsize: Vector3 = data.get_size()
+
 	# 优先使用预制体外观（BuildingData.scene_path）
 	var used_scene := false
 	var sp: String = data.get("scene_path") if "scene_path" in data else ""
@@ -606,9 +613,25 @@ func place_building(data: Resource, pos: Vector3, rot_y: float, from_save: bool 
 					n.collision_layer = 1
 				add_child(n)
 				used_scene = true
+				# ★ 光源参数以 .tres 为准：覆盖预制体内的灯光（位置仍在 .tscn 内）
+				if data.get("emits_light"):
+					for light in n.find_children("*", "OmniLight3D", true, false):
+						var ol := light as OmniLight3D
+						ol.light_color = data.get("light_color")
+						ol.light_energy = data.get("light_energy")
+						ol.omni_range = data.get("light_range")
+						ol.omni_attenuation = data.get("light_attenuation")
+						ol.shadow_enabled = data.get("light_shadow_enabled")
+				# 用实际实例的 AABB 计算占地（更准确，含缩放）
+				var nsz := BuildingData._compute_aabb_size(n)
+				if nsz != Vector3.ZERO:
+					bsize = nsz
+				# 危险区：触碰扣血 + 击退
+				if data.get("hazard_damage") > 0.0:
+					_attach_hazard(n, bsize, data)
 
 	if not used_scene:
-		# 回退：程序化 BoxMesh + 颜色 + 灯光
+		# 回退：程序化 BoxMesh + 颜色 + 灯光（用 get_size 默认 1×1×1）
 		var body := StaticBody3D.new()
 		body.name = "Building_" + data.id
 		body.collision_layer = 1
@@ -618,7 +641,7 @@ func place_building(data: Resource, pos: Vector3, rot_y: float, from_save: bool 
 
 		var mesh := MeshInstance3D.new()
 		var box := BoxMesh.new()
-		box.size = data.size
+		box.size = bsize
 		mesh.mesh = box
 		var mat := StandardMaterial3D.new()
 		mat.albedo_color = data.color
@@ -628,7 +651,7 @@ func place_building(data: Resource, pos: Vector3, rot_y: float, from_save: bool 
 
 		var col := CollisionShape3D.new()
 		var shape := BoxShape3D.new()
-		shape.size = data.size
+		shape.size = bsize
 		col.shape = shape
 		body.add_child(col)
 
@@ -637,16 +660,42 @@ func place_building(data: Resource, pos: Vector3, rot_y: float, from_save: bool 
 			light.light_color = data.light_color
 			light.light_energy = data.light_energy
 			light.omni_range = data.light_range
-			light.position = Vector3(0, data.size.y * 0.5 + 0.6, 0)
+			light.omni_attenuation = data.light_attenuation
+			light.shadow_enabled = data.light_shadow_enabled
+			light.position = Vector3(0, bsize.y * 0.5 + 0.6, 0)
 			body.add_child(light)
 
-	var half := Vector2(data.size.x, data.size.z) * 0.5
+		if data.hazard_damage > 0.0:
+			_attach_hazard(body, bsize, data)
+
+	var half := Vector2(bsize.x, bsize.z) * 0.5
 	if int(round(rad_to_deg(rot_y))) % 180 != 0:
-		half = Vector2(data.size.z, data.size.x) * 0.5
+		half = Vector2(bsize.z, bsize.x) * 0.5
 	register_occupied(AABB(
 		Vector3(pos.x - half.x, 0.0, pos.z - half.y),
-		Vector3(half.x * 2.0, data.size.y, half.y * 2.0)
+		Vector3(half.x * 2.0, bsize.y, half.y * 2.0)
 	))
+
+
+## 为建筑附加危险区（触碰扣血 + 击退），Area3D 覆盖建筑占地范围
+func _attach_hazard(building: Node3D, size: Vector3, data: Resource) -> void:
+	var HazardScript := load("res://scripts/combat/hazard.gd")
+	var hazard: Area3D = Area3D.new()
+	hazard.name = "Hazard"
+	hazard.set_script(HazardScript)
+	hazard.setup(
+		float(data.get("hazard_damage")),
+		float(data.get("hazard_interval")),
+		float(data.get("hazard_knockback")),
+		float(data.get("hazard_knockback_up"))
+	)
+	var col := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(maxf(size.x, 0.5), maxf(size.y, 0.5), maxf(size.z, 0.5))
+	col.shape = shape
+	col.position = Vector3(0, size.y * 0.5, 0)
+	hazard.add_child(col)
+	building.add_child(hazard)
 
 # ═══════════════════════════════════════════
 # 玩家

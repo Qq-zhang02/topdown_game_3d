@@ -453,11 +453,11 @@ func _turn_off_all() -> void:
 func _apply_to_spot(eq: Resource) -> void:
 	if not _spot_light:
 		return
-	_spot_light.position = eq.get("position_offset")
-	_spot_light.rotation = eq.get("rotation_offset")
+	# ★ 位置/旋转/角度范围(spot_angle)由场景(.tscn)可视化摆定，不被覆盖；
+	#   强度/射程/距离衰减/角度衰减/颜色/阴影由装备数据(.tres)控制
 	_spot_light.spot_range = eq.get("spot_range")
 	_spot_light.spot_attenuation = eq.get("spot_attenuation")
-	_spot_light.spot_angle = eq.get("spot_angle")
+	_spot_light.spot_angle_attenuation = eq.get("spot_angle_attenuation")
 	_spot_light.light_color = eq.get("light_color")
 	_spot_light.light_energy = eq.get("light_energy")
 	_spot_light.light_indirect_energy = eq.get("light_indirect_energy")
@@ -468,7 +468,8 @@ func _apply_to_spot(eq: Resource) -> void:
 func _apply_to_omni(eq: Resource) -> void:
 	if not _omni_light:
 		return
-	_omni_light.position = eq.get("position_offset")
+	# ★ 位置由场景(.tscn)可视化摆定，不被覆盖；
+	#   强度/范围/衰减/颜色等效果参数由装备数据(.tres)控制
 	_omni_light.omni_range = eq.get("omni_range")
 	_omni_light.omni_attenuation = eq.get("omni_attenuation")
 	_omni_light.light_color = eq.get("light_color")

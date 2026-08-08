@@ -1,36 +1,33 @@
-[gd_scene load_steps=4 format=3 uid="uid://c3dmain0001"]
+[gd_scene format=3 uid="uid://c3dmain0001"]
 
 [ext_resource type="Script" uid="uid://bovy7fk3olqr5" path="res://scripts/world_3d.gd" id="1_world"]
-[ext_resource type="PackedScene" path="res://models/landscape/地形.glb" id="2_terrain"]
+[ext_resource type="PackedScene" uid="uid://concofsilyv6y" path="res://models/landscape/地形.glb" id="2_terrain"]
 
 [sub_resource type="Environment" id="Environment_world"]
-ambient_light_source = 2
-ambient_light_color = Color(0.35, 0.38, 0.45, 1)
 background_mode = 1
 background_color = Color(0.12, 0.18, 0.28, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.35, 0.38, 0.45, 1)
 ssao_enabled = true
 ssao_light_affect = 0.3
-glow_enabled = false
 
 [node name="World3D" type="Node3D" unique_id=857670015]
 script = ExtResource("1_world")
 
-[node name="SunLight" type="DirectionalLight3D" parent="."]
-rotation_degrees = Vector3(-90, 30, 0)
-light_energy = 1.0
+[node name="SunLight" type="DirectionalLight3D" parent="." unique_id=2013642459]
+transform = Transform3D(0.8660254, -0.5, -2.1855694e-08, 0, -4.371139e-08, 1, -0.5, -0.8660254, -3.7855173e-08, 0, 0, 0)
 shadow_enabled = true
 
-[node name="MoonLight" type="DirectionalLight3D" parent="."]
-rotation_degrees = Vector3(90, 210, 0)
+[node name="MoonLight" type="DirectionalLight3D" parent="." unique_id=1085306976]
+transform = Transform3D(-0.8660254, -0.49999997, 2.1855692e-08, 0, -4.371139e-08, -1, 0.49999997, -0.8660254, 3.7855173e-08, 0, 0, 0)
 light_color = Color(0.45, 0.55, 0.85, 1)
 light_energy = 0.0
 
-[node name="WorldEnv" type="WorldEnvironment" parent="."]
+[node name="WorldEnv" type="WorldEnvironment" parent="." unique_id=1316472433]
 environment = SubResource("Environment_world")
 
-[node name="Terrain" type="Node3D" parent="."]
+[node name="Terrain" type="Node3D" parent="." unique_id=736177077]
 
-[node name="TerrainModel" parent="Terrain" instance=ExtResource("2_terrain")]
+[node name="TerrainModel" parent="Terrain" unique_id=354460902 instance=ExtResource("2_terrain")]
 
-[node name="TerrainBody" type="StaticBody3D" parent="Terrain"]
-collision_layer = 1
+[node name="TerrainBody" type="StaticBody3D" parent="Terrain" unique_id=979244605]

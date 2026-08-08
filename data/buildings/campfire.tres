@@ -1,20 +1,22 @@
-[gd_resource type="Resource" script_class="BuildingData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="BuildingData" format=3 uid="uid://xod8it2p7gsk"]
 
-[ext_resource type="Script" path="res://scripts/building/building_data.gd" id="1"]
+[ext_resource type="Script" uid="uid://dlofvy55fdt4t" path="res://scripts/building/building_data.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
 id = "campfire"
 display_name = "篝火"
 description = "照亮黑夜，温暖人心"
-size = Vector3(1, 0.5, 1)
 color = Color(0.45, 0.28, 0.12, 1)
 cost = {
-"wood": 5,
-"stone": 3
+"stone": 3,
+"wood": 5
 }
 scene_path = "res://scenes/prefabs/building_campfire.tscn"
 emits_light = true
-light_color = Color(1, 0.6, 0.2, 1)
 light_energy = 3.5
 light_range = 9.0
+hazard_damage = 0.1
+hazard_interval = 0.5
+hazard_knockback = 4.0
+hazard_knockback_up = 2.0

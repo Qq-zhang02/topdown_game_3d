@@ -15,6 +15,7 @@ var _recipes: Array = []
 var _menu: CanvasLayer
 
 var _current: Resource = null
+var _current_size: Vector3 = Vector3.ONE  # 从预制体 AABB 缓存的尺寸
 var _placing: bool = false
 var _rot_index: int = 0  # 0~3，90° 一档
 var _ghost: MeshInstance3D
@@ -72,6 +73,8 @@ func _create_menu() -> void:
 
 func _on_recipe_selected(data: Resource) -> void:
 	_current = data
+	# ★ 尺寸由预制体 mesh AABB 决定（tres 不保存尺寸），选中时缓存一次
+	_current_size = data.get_size()
 	_rot_index = 0
 	_placing = true
 	_menu.hide()
@@ -95,14 +98,14 @@ func _create_ghost() -> void:
 
 func _update_ghost_mesh() -> void:
 	var box := BoxMesh.new()
-	box.size = _current.size
+	box.size = _current_size
 	_ghost.mesh = box
 	_ghost.visible = true
 
 
 ## 旋转后的 XZ 半尺寸
 func _half_extents() -> Vector2:
-	var s: Vector3 = _current.size
+	var s: Vector3 = _current_size
 	if _rot_index % 2 == 1:
 		return Vector2(s.z, s.x) * 0.5
 	return Vector2(s.x, s.z) * 0.5
@@ -115,7 +118,7 @@ func _process(_delta: float) -> void:
 	var target: Vector3 = _player.get_mouse_ground_position()
 	target.x = roundf(target.x / GRID) * GRID
 	target.z = roundf(target.z / GRID) * GRID
-	target.y = _world.get_terrain_height_at(target.x, target.z) + _current.size.y * 0.5
+	target.y = _world.get_terrain_height_at(target.x, target.z) + _current_size.y * 0.5
 	_ghost_pos = target
 
 	_ghost.position = target

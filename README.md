@@ -1,4 +1,4 @@
-# TopDownGame3D v3.5.0
+# TopDownGame3D v3.5.1
 
 > Godot 4.7.1 · 俯视角 3D · 全 GDScript · 2026-07-26
 
@@ -46,6 +46,7 @@ topdown_game_3d-v3/
 │   ├── combat/
 │   │   ├── health.gd          # 通用血量组件（受击红闪+溅射粒子，自动覆盖所有挂载者）
 │   │   ├── melee_controller.gd# 近战：左键扇形判定，伤害取自当前 WeaponData
+│   │   ├── hazard.gd          # ★ 危险区组件：触碰扣血+击退（篝火/地刺等）
 │   │   └── pickup.gd          # 掉落物：上抛弹跳→滑行→可拾取，射线贴合地形，飞向角色消失
 │   ├── building/
 │   │   ├── building_data.gd   # 建筑定义：尺寸/颜色/材料消耗/发光
@@ -219,8 +220,32 @@ var current_speed: float = speed * 0.25 if is_aiming() else speed
 | `light_color` | Color | 光颜色（篝火默认暖橙） |
 | `light_energy` | float | 光强度（默认 3.0） |
 | `light_range` | float | 光照范围（默认 8m） |
+| `light_attenuation` | float | 衰减（默认 1.0） |
+| `light_shadow_enabled` | bool | 灯光是否投阴影 |
 
-发光建筑放置时自动添加 OmniLight3D 子节点，位置在建筑顶部以上 0.6m。
+发光建筑放置时自动添加 OmniLight3D 子节点，位置在建筑顶部以上 0.6m。光源参数以 `.tres` 为准，放置时覆盖预制体内的灯光值（灯光位置仍在 `.tscn` 预制体内）。
+
+### 危险区（触碰扣血 + 击退，v3.5.1+）
+
+**文件：** `scripts/combat/hazard.gd`（`class_name Hazard`，基于 Area3D 的可复用组件）
+
+建筑可通过 `BuildingData` 配置为危险区（如篝火），玩家触碰后扣血并击退：
+
+| 属性 | 类型 | 说明 |
+|------|------|------|
+| `hazard_damage` | float | 每次扣血量（>0 启用危险区） |
+| `hazard_interval` | float | 扣血间隔（秒） |
+| `hazard_knockback` | float | 水平击退冲量（0 = 不击退） |
+| `hazard_knockback_up` | float | 竖直击退冲量（瞬时上抛，独立于水平） |
+
+**机制：**
+- 玩家进入危险区立即触发一次扣血，之后按 `hazard_interval` 周期性扣血
+- 击退方向为"从危险区中心向外"，水平击退走衰减机制（推开滑动感）
+- 竖直击退为**瞬时冲量**（直接作用于 velocity.y，与跳跃同机制），避免落地后残值反复抬升抖动
+- `place_building()` 自动为 `hazard_damage > 0` 的建筑附加 Area3D（覆盖占地范围）
+- 后续地刺等危险物：新建 .tres 配 `hazard_*` 字段即可复用，无需改代码
+
+**篝火当前配置（campfire.tres）：** `hazard_damage=5.0`、`hazard_interval=0.5`、`hazard_knockback=6.0`、`hazard_knockback_up=2.0`
 
 ### 地形系统（v3.4.1+）
 
@@ -719,6 +744,18 @@ v3.5.0 将原先纯代码生成的 3D 内容场景化，**大部分内容现在�
 | 障碍物 | `scenes/prefabs/obstacle.tscn` | 单位尺寸（1×1×1），运行时按随机尺寸缩放；材质运行时覆盖 |
 | 建筑外观 | `scenes/prefabs/building_*.tscn` | 篝火/木地基/木墙；`BuildingData.scene_path` 指向预制体，可加自定义 mesh/粒子 |
 | 物品/建筑数值 | `data/items/*.tres`、`data/buildings/*.tres` | 检查器直接编辑（伤害、回血、成本、尺寸等） |
+
+### 装备光源职责划分
+
+灯光参数按来源分工（手电筒/火把/篝火）：
+
+| 参数 | 配置位置 | 说明 |
+|------|---------|------|
+| 位置 / 旋转 | `.tscn`（player.tscn / building_*.tscn） | 编辑器可视化摆放，装备切换不覆盖 |
+| 光锥角度 `spot_angle` | `.tscn`（SpotLight 节点） | 手电筒光锥范围 |
+| 强度 `light_energy` | `.tres`（equipment/*.tres、buildings/*.tres） | 手电 5 / 火把 5 / 篝火 3.5 |
+| 射程 / 衰减 | `.tres` | `spot_range`/`omni_range`、`spot_attenuation`/`omni_attenuation` |
+| 颜色 / 阴影 | `.tres` | `light_color`、`shadow_enabled`（动态光关阴影避免玩家产生影子） |
 
 ### 保留代码生成的部分
 

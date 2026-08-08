@@ -1,3 +1,4 @@
+@tool
 extends CharacterBody3D
 class_name Player3D
 ## 3D 俯视角玩家
@@ -42,6 +43,10 @@ func set_skin_path(path: String) -> void:
 
 
 func _ready() -> void:
+	# 编辑器预览：给场景中预置的模型应用皮肤贴图（GLB 无内嵌贴图）
+	if Engine.is_editor_hint():
+		_apply_editor_preview_skin()
+		return
 	_create_model()
 	_create_collision()
 	_create_inventory()
@@ -65,6 +70,10 @@ func _create_model() -> void:
 	var placeholder: Node3D = get_node_or_null("CharacterModel")
 	if not placeholder:
 		return
+	# 清掉编辑器里预置的预览模型，运行时按角色选择加载实际模型
+	for child in placeholder.get_children():
+		placeholder.remove_child(child)
+		child.queue_free()
 	_model_root = scene.instantiate()
 	_model_root.name = "CharacterModelInstance"
 	placeholder.add_child(_model_root)
@@ -116,28 +125,50 @@ func _apply_skin(model_path: String) -> void:
 			mesh.set_surface_override_material(i, mat)
 
 
+## 编辑器预览：给场景预置模型应用皮肤（GLB 无内嵌贴图，运行时才应用）
+func _apply_editor_preview_skin() -> void:
+	if _skin_path.is_empty() or not ResourceLoader.exists(_skin_path):
+		return
+	var tex: Texture2D = load(_skin_path)
+	if not tex:
+		return
+	var placeholder := get_node_or_null("CharacterModel")
+	if not placeholder:
+		return
+	for node: Node in placeholder.find_children("*", "MeshInstance3D", true, false):
+		var mesh := node as MeshInstance3D
+		if not mesh or not mesh.mesh:
+			continue
+		for i in mesh.mesh.get_surface_count():
+			var mat := mesh.get_active_material(i)
+			if not mat:
+				continue
+			var dup := mat.duplicate()
+			if dup is StandardMaterial3D:
+				dup.albedo_texture = tex
+				mesh.set_surface_override_material(i, dup)
+
+
 func _create_collision() -> void:
-	# 场景中已预置 CollisionShape3D（Capsule 0.4/1.6），此处按模型 AABB 精调
+	# ★ 场景中预置的 CollisionShape3D 优先：完全尊重编辑器里调整的
+	#   形状/位置，不再按模型 AABB 覆盖（可视化编辑即所见即所得）
 	var col: CollisionShape3D = get_node_or_null("CollisionShape3D")
-	if not col:
-		col = CollisionShape3D.new()
-		add_child(col)
+	if col:
+		_collision_shape = col
+		return
+	# 兜底：场景无碰撞节点时按模型 AABB 生成
+	col = CollisionShape3D.new()
+	add_child(col)
 	_collision_shape = col
-
 	if not _model_root:
-		return  # 保留场景默认碰撞体
-
+		return
 	var aabb := _get_model_aabb(_model_root)
 	if aabb.size.length_squared() < 0.1:
-		return  # 模型 AABB 过小，保留默认
-
-	# 新建 shape 赋值（避免 mutate 场景共享资源）
+		return
 	var shape := CapsuleShape3D.new()
 	shape.radius = max(aabb.size.x, aabb.size.z) * 0.45
 	shape.height = aabb.size.y * 0.85
 	col.shape = shape
-	# AABB.position 是最小角而非中心，必须用 get_center() 或 position + size/2
-	# to_local 确保在世界坐标->本地坐标正确转换
 	col.position = to_local(aabb.position + aabb.size * 0.5)
 
 
@@ -310,6 +341,13 @@ func apply_knockback(dir: Vector3, impulse: float) -> void:
 	_knockback = dir * impulse
 
 
+## 竖直击退：瞬时冲量（直接作用于 velocity.y，与跳跃同机制）
+## 只生效一帧，不进入 _knockback 衰减队列，避免落地后残值反复抬升抖动
+func apply_up_knockback(v: float) -> void:
+	if v > 0.0:
+		velocity.y = maxf(velocity.y, v)
+
+
 func is_dead() -> bool:
 	return _dead
 
@@ -324,6 +362,8 @@ func _on_died() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if Engine.is_editor_hint():
+		return
 	if _dead:
 		return
 	if event.is_action_pressed("cycle_equipment"):
@@ -378,6 +418,8 @@ func set_in_water(v: bool) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if Engine.is_editor_hint():
+		return
 	if _dead:
 		return
 

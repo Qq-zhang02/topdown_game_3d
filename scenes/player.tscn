@@ -1,37 +1,45 @@
-[gd_scene load_steps=7 format=3 uid="uid://c3dplayer01"]
+[gd_scene format=3 uid="uid://c3dplayer01"]
 
 [ext_resource type="Script" uid="uid://d0mtxcjyarinx" path="res://scripts/player_3d.gd" id="1_player"]
 [ext_resource type="Script" uid="uid://ch2jq4y02kw8t" path="res://scripts/inventory/inventory.gd" id="2_inv"]
 [ext_resource type="Script" uid="uid://b8ktlq8xqwd8x" path="res://scripts/combat/health.gd" id="3_health"]
 [ext_resource type="Script" uid="uid://cs4aad500e4bp" path="res://scripts/combat/melee_controller.gd" id="4_melee"]
 [ext_resource type="Script" uid="uid://dv0pmsiyfcs4b" path="res://scripts/equipment_manager.gd" id="5_equip"]
+[ext_resource type="PackedScene" uid="uid://728ir2376bbn" path="res://models/character/character-archer.glb" id="6_model"]
 
-[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
-radius = 0.4
-height = 1.6
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_smehm"]
+margin = 0.0
+radius = 0.4868164
+height = 0.9736328
 
-[node name="Player3D" type="CharacterBody3D"]
+[node name="Player3D" type="CharacterBody3D" unique_id=1530437618]
 script = ExtResource("1_player")
 
-[node name="CharacterModel" type="Node3D" parent="."]
+[node name="CharacterModel" type="Node3D" parent="." unique_id=1099805797]
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
-shape = SubResource("CapsuleShape3D_body")
+[node name="CharacterModelPreview" parent="CharacterModel" unique_id=1214472562 instance=ExtResource("6_model")]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
 
-[node name="SpotLight" type="SpotLight3D" parent="."]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=554565521]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4071381, 0)
+shape = SubResource("CapsuleShape3D_smehm")
+debug_color = Color(0, 0.43137255, 0.5058824, 0.65882355)
+
+[node name="SpotLight" type="SpotLight3D" parent="." unique_id=1319968345]
+transform = Transform3D(1, 0, 0, 0, 0.9884217, 0.15173215, 0, -0.15173215, 0.9884217, 0, 0.31, -0.25894728)
 visible = false
 
-[node name="OmniLight" type="OmniLight3D" parent="."]
-visible = false
+[node name="OmniLight" type="OmniLight3D" parent="." unique_id=1078076314]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.42534935, 1.9725574, -0.45434338)
 
-[node name="Inventory" type="Node" parent="."]
+[node name="Inventory" type="Node" parent="." unique_id=623325997]
 script = ExtResource("2_inv")
 
-[node name="Health" type="Node" parent="."]
+[node name="Health" type="Node" parent="." unique_id=1706219111]
 script = ExtResource("3_health")
 
-[node name="MeleeController" type="Node" parent="."]
+[node name="MeleeController" type="Node" parent="." unique_id=1016346061]
 script = ExtResource("4_melee")
 
-[node name="EquipmentManager" type="Node" parent="."]
+[node name="EquipmentManager" type="Node" parent="." unique_id=274977033]
 script = ExtResource("5_equip")

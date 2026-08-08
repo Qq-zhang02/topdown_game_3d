@@ -5,15 +5,12 @@
 [resource]
 script = ExtResource("1")
 light_type = 1
-light_color = Color(1, 0.95, 0.8, 1)
-light_energy = 8.0
-light_indirect_energy = 1.5
-shadow_enabled = false
-position_offset = Vector3(0, 1, -0.4)
-rotation_offset = Vector3(-0.349066, 0, 0)
+light_color = Color(1, 0.9490196, 0.8, 1)
+light_energy = 5.0
+shadow_enabled = true
 spot_range = 50.0
-spot_attenuation = 0.8
-spot_angle = 65.0
+spot_attenuation = 1.0
+spot_angle_attenuation = 1.3
 id = "flashlight"
 display_name = "手电筒"
 description = "指向性光源，照亮前方"

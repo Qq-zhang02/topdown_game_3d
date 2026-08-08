@@ -8,7 +8,7 @@ const WeaponDataClass := preload("res://scripts/items/weapon_data.gd")
 @export var fist_damage: float = 5.0
 @export var fist_range: float = 1          # 前方攻击距离（米）
 @export var fist_arc: float = 0.3            # 圆柱半径（米，原名 arc 沿用）
-@export var fist_cooldown: float = 0.4
+@export var fist_cooldown: float = 0.3
 @export var fist_knockback: float = 2.0
 @export var hit_delay: float = 0.18
 

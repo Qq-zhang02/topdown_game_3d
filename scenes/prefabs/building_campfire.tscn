@@ -1,26 +1,23 @@
-[gd_scene load_steps=4 format=3]
-
-[sub_resource type="BoxMesh" id="BoxMesh_campfire"]
-size = Vector3(1, 0.5, 1)
+[gd_scene format=3 uid="uid://j0hih0x5jgnm"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_campfire"]
 albedo_color = Color(0.45, 0.28, 0.12, 1)
 roughness = 0.8
 
+[sub_resource type="BoxMesh" id="BoxMesh_campfire"]
+size = Vector3(1, 0.5, 1)
+
 [sub_resource type="BoxShape3D" id="BoxShape3D_campfire"]
 size = Vector3(1, 0.5, 1)
 
-[node name="Campfire" type="StaticBody3D"]
+[node name="Campfire" type="StaticBody3D" unique_id=1262851473]
 
-[node name="Mesh" type="MeshInstance3D" parent="."]
-mesh = SubResource("BoxMesh_campfire")
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=904579489]
 material_override = SubResource("StandardMaterial3D_campfire")
+mesh = SubResource("BoxMesh_campfire")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=2110924066]
 shape = SubResource("BoxShape3D_campfire")
 
-[node name="Light" type="OmniLight3D" parent="."]
+[node name="Light" type="OmniLight3D" parent="." unique_id=1477136831]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 0)
-light_color = Color(1, 0.6, 0.2, 1)
-light_energy = 3.5
-omni_range = 9.0
