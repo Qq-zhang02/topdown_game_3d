@@ -79,8 +79,7 @@ func _remove_save_select() -> void:
 
 func _on_game_started(model_path: String, skin_path: String, save_slot: int) -> void:
 	_save_slot = save_slot
-	# 玩家选好角色后，构建世界
-	_create_lighting()
+	# 玩家选好角色后，构建世界（光照/地形已在 main.tscn 场景中）
 	_create_ground()
 	_create_obstacles()
 	_create_lava()
@@ -118,46 +117,12 @@ func _initial_save_after_world_ready() -> void:
 
 
 # ═══════════════════════════════════════════
-# 光照
-# ═══════════════════════════════════════════
-
-func _create_lighting() -> void:
-	var sun := DirectionalLight3D.new()
-	sun.name = "SunLight"
-	sun.rotation_degrees = Vector3(-90, 30, 0)
-	sun.shadow_enabled = true
-	sun.light_energy = 1.0
-	add_child(sun)
-
-	var moon := DirectionalLight3D.new()
-	moon.name = "MoonLight"
-	moon.rotation_degrees = Vector3(90, 210, 0)
-	moon.shadow_enabled = false
-	moon.light_color = Color(0.45, 0.55, 0.85)
-	moon.light_energy = 0.0
-	add_child(moon)
-
-	var env_node := WorldEnvironment.new()
-	env_node.name = "WorldEnv"
-	var env := Environment.new()
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.35, 0.38, 0.45)
-	env.background_color = Color(0.12, 0.18, 0.28)
-	env.ssao_enabled = true
-	env.ssao_light_affect = 0.3
-	env.glow_enabled = false
-	env_node.environment = env
-	add_child(env_node)
-
-
-# ═══════════════════════════════════════════
-# 地面
+# 地面（场景含 Terrain/光照，world_3d 只负责适配与碰撞）
 # ═══════════════════════════════════════════
 
 func _create_ground() -> void:
-	const TERRAIN_PATH := "res://models/landscape/地形.glb"
-	if not ResourceLoader.exists(TERRAIN_PATH):
-		# 回退：程序化地面
+	if not has_node("Terrain"):
+		# 回退：程序化地面（场景中无 Terrain 节点时）
 		var total_size := WORLD_HALF * 2.0
 		var ground := MeshInstance3D.new()
 		ground.name = "Ground"
@@ -182,13 +147,38 @@ func _create_ground() -> void:
 		add_child(body)
 		return
 
-	var scene: PackedScene = load(TERRAIN_PATH)
-	var terrain: Node3D = scene.instantiate()
-	terrain.name = "Terrain"
-	terrain.position = Vector3.ZERO
-	add_child(terrain)
+	var terrain: Node3D = $Terrain
+	_fit_terrain(terrain)
 
-	# 计算地形整体 AABB
+	# 运行时构建地形碰撞（ConcavePolygonShape，避免编辑器序列化 8k+ 三角形）
+	var body_node: StaticBody3D = terrain.get_node_or_null("TerrainBody")
+	if not body_node:
+		body_node = StaticBody3D.new()
+		body_node.name = "TerrainBody"
+		body_node.collision_layer = 1
+		terrain.add_child(body_node)
+
+	# 清掉旧碰撞子节点（重复调用时）
+	for old in body_node.get_children():
+		body_node.remove_child(old)
+		old.queue_free()
+
+	var mesh_count := 0
+	for mi in terrain.find_children("*", "MeshInstance3D", true, false):
+		if mi.mesh and mi.mesh.get_faces().size() > 0:
+			var col := CollisionShape3D.new()
+			var shape := ConcavePolygonShape3D.new()
+			shape.set_faces(mi.mesh.get_faces())
+			col.shape = shape
+			col.global_transform = mi.global_transform
+			body_node.add_child(col)
+			mesh_count += 1
+
+	print("[World3D] 地形碰撞构建完成: %d 个碰撞体" % mesh_count)
+
+
+## 自动适配地形：居中并缩放到世界范围（回退保险，编辑器已摆好时幂等）
+func _fit_terrain(terrain: Node3D) -> void:
 	var aabb := AABB()
 	for mi in terrain.find_children("*", "MeshInstance3D", true, false):
 		var m: MeshInstance3D = mi
@@ -199,6 +189,8 @@ func _create_ground() -> void:
 				aabb = global_aabb
 			else:
 				aabb = aabb.merge(global_aabb)
+	if aabb.size.length_squared() < 0.01:
+		return
 
 	# 将地形最低点沉到 y=0，中心对齐世界原点
 	terrain.position = Vector3(-aabb.get_center().x, -aabb.position.y, -aabb.get_center().z)
@@ -206,31 +198,10 @@ func _create_ground() -> void:
 	# 缩放地形使其 XZ 覆盖世界范围
 	var terrain_xz := maxf(aabb.size.x, aabb.size.z)
 	var target_xz := WORLD_HALF * 2.0
-	var scale_factor := 1.0
 	if terrain_xz > 0.01 and terrain_xz < target_xz:
-		scale_factor = target_xz / terrain_xz
+		var scale_factor := target_xz / terrain_xz
 		terrain.scale = Vector3(scale_factor, 1.0, scale_factor)
 		print("[World3D] 地形缩放: %.1f → %.1f (×%.2f)" % [terrain_xz, target_xz, scale_factor])
-
-	# 手动创建碰撞体（从 mesh face 构建，放在世界根下避免变换继承问题）
-	var body := StaticBody3D.new()
-	body.name = "TerrainBody"
-	body.collision_layer = 1
-	add_child(body)
-
-	var mesh_count := 0
-	for mi in terrain.find_children("*", "MeshInstance3D", true, false):
-		if mi.mesh and mi.mesh.get_faces().size() > 0:
-			var col := CollisionShape3D.new()
-			var shape := ConcavePolygonShape3D.new()
-			shape.set_faces(mi.mesh.get_faces())
-			col.shape = shape
-			# 用全局变换：terrain.position/scale/rotation × mesh 局部变换
-			col.global_transform = terrain.global_transform * mi.transform
-			body.add_child(col)
-			mesh_count += 1
-
-	print("[World3D] 地形加载完成, %d 个碰撞体, 缩放=%.1f, AABB=%s" % [mesh_count, scale_factor, aabb.size])
 
 
 ## 公开接口：获取地形表面高度（供建造等外部系统使用）
@@ -312,6 +283,8 @@ func _create_obstacles() -> void:
 	rng.seed = 42
 	var margin: float = 5.0
 	var material_presets := _make_material_presets()
+	const PREFAB := "res://scenes/prefabs/obstacle.tscn"
+	var prefab: PackedScene = load(PREFAB) if ResourceLoader.exists(PREFAB) else null
 
 	for i in range(OBSTACLE_COUNT):
 		var w: float = rng.randf_range(1.0, 4.0)
@@ -328,29 +301,46 @@ func _create_obstacles() -> void:
 		elif roll < 0.25: mat_idx = 2
 		elif roll < 0.50: mat_idx = 1
 
-		var vis := MeshInstance3D.new()
-		vis.name = "Obstacle_%d" % i
-		vis.position = pos
-		var box := BoxMesh.new()
-		box.size = Vector3(w, h, d)
-		vis.mesh = box
-		vis.material_override = material_presets[mat_idx].duplicate()
-		vis.material_override.albedo_color = Color(
-			rng.randf_range(0.3, 0.55),
-			rng.randf_range(0.35, 0.55),
-			rng.randf_range(0.3, 0.50)
-		)
-		add_child(vis)
-
-		var sb := StaticBody3D.new()
-		sb.name = "ObstacleBody_%d" % i
-		sb.position = pos
-		var sc := CollisionShape3D.new()
-		var shp := BoxShape3D.new()
-		shp.size = Vector3(w, h, d)
-		sc.shape = shp
-		sb.add_child(sc)
-		add_child(sb)
+		if prefab:
+			# 使用预制体：单位尺寸，运行时按随机尺寸缩放 + 材质颜色覆盖
+			var inst: StaticBody3D = prefab.instantiate()
+			inst.name = "Obstacle_%d" % i
+			inst.position = pos
+			inst.scale = Vector3(w, h, d)
+			var mesh: MeshInstance3D = inst.get_node_or_null("Mesh") as MeshInstance3D
+			if mesh:
+				var mat: StandardMaterial3D = material_presets[mat_idx].duplicate()
+				mat.albedo_color = Color(
+					rng.randf_range(0.3, 0.55),
+					rng.randf_range(0.35, 0.55),
+					rng.randf_range(0.3, 0.50)
+				)
+				mesh.material_override = mat
+			add_child(inst)
+		else:
+			# 回退：程序化构建
+			var vis := MeshInstance3D.new()
+			vis.name = "Obstacle_%d" % i
+			vis.position = pos
+			var box := BoxMesh.new()
+			box.size = Vector3(w, h, d)
+			vis.mesh = box
+			vis.material_override = material_presets[mat_idx].duplicate()
+			vis.material_override.albedo_color = Color(
+				rng.randf_range(0.3, 0.55),
+				rng.randf_range(0.35, 0.55),
+				rng.randf_range(0.3, 0.50)
+			)
+			add_child(vis)
+			var sb := StaticBody3D.new()
+			sb.name = "ObstacleBody_%d" % i
+			sb.position = pos
+			var sc := CollisionShape3D.new()
+			var shp := BoxShape3D.new()
+			shp.size = Vector3(w, h, d)
+			sc.shape = shp
+			sb.add_child(sc)
+			add_child(sb)
 
 		_obstacle_positions.append(pos)
 		_obstacle_data.append({"position": pos, "size": Vector3(w, h, d)})
@@ -600,36 +590,55 @@ func place_building(data: Resource, pos: Vector3, rot_y: float, from_save: bool 
 			"rot_y": rot_y
 		})
 
-	var body := StaticBody3D.new()
-	body.name = "Building_" + data.id
-	body.collision_layer = 1
-	body.position = pos
-	body.rotation.y = rot_y
-	add_child(body)
+	# 优先使用预制体外观（BuildingData.scene_path）
+	var used_scene := false
+	var sp: String = data.get("scene_path") if "scene_path" in data else ""
+	if not sp.is_empty() and ResourceLoader.exists(sp):
+		var ps: PackedScene = load(sp)
+		if ps:
+			var inst := ps.instantiate()
+			if inst is Node3D:
+				var n := inst as Node3D
+				n.name = "Building_" + data.id
+				n.position = pos
+				n.rotation.y = rot_y
+				if n is StaticBody3D:
+					n.collision_layer = 1
+				add_child(n)
+				used_scene = true
 
-	var mesh := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = data.size
-	mesh.mesh = box
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = data.color
-	mat.roughness = 0.8
-	mesh.material_override = mat
-	body.add_child(mesh)
+	if not used_scene:
+		# 回退：程序化 BoxMesh + 颜色 + 灯光
+		var body := StaticBody3D.new()
+		body.name = "Building_" + data.id
+		body.collision_layer = 1
+		body.position = pos
+		body.rotation.y = rot_y
+		add_child(body)
 
-	var col := CollisionShape3D.new()
-	var shape := BoxShape3D.new()
-	shape.size = data.size
-	col.shape = shape
-	body.add_child(col)
+		var mesh := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = data.size
+		mesh.mesh = box
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = data.color
+		mat.roughness = 0.8
+		mesh.material_override = mat
+		body.add_child(mesh)
 
-	if data.emits_light:
-		var light := OmniLight3D.new()
-		light.light_color = data.light_color
-		light.light_energy = data.light_energy
-		light.omni_range = data.light_range
-		light.position = Vector3(0, data.size.y * 0.5 + 0.6, 0)
-		body.add_child(light)
+		var col := CollisionShape3D.new()
+		var shape := BoxShape3D.new()
+		shape.size = data.size
+		col.shape = shape
+		body.add_child(col)
+
+		if data.emits_light:
+			var light := OmniLight3D.new()
+			light.light_color = data.light_color
+			light.light_energy = data.light_energy
+			light.omni_range = data.light_range
+			light.position = Vector3(0, data.size.y * 0.5 + 0.6, 0)
+			body.add_child(light)
 
 	var half := Vector2(data.size.x, data.size.z) * 0.5
 	if int(round(rad_to_deg(rot_y))) % 180 != 0:

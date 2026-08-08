@@ -1,0 +1,34 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" uid="uid://d1hxujnocltk2" path="res://scripts/combat/pickup.gd" id="1_pickup"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_pickup"]
+size = Vector3(0.32, 0.32, 0.32)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pickup"]
+albedo_color = Color(0.7, 0.7, 0.7, 1)
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_pickup"]
+radius = 1.1
+
+[node name="Pickup" type="Node3D"]
+script = ExtResource("1_pickup")
+
+[node name="Mesh" type="MeshInstance3D" parent="."]
+mesh = SubResource("BoxMesh_pickup")
+material_override = SubResource("StandardMaterial3D_pickup")
+
+[node name="Label" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.55, 0)
+billboard = 1
+font_size = 48
+pixel_size = 0.008
+outline_size = 8
+modulate = Color(1, 1, 1, 0.95)
+
+[node name="Area" type="Area3D" parent="."]
+collision_layer = 0
+collision_mask = 1
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Area"]
+shape = SubResource("SphereShape3D_pickup")

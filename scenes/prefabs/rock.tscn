@@ -1,0 +1,33 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" uid="uid://dyfk6gr3xdpb3" path="res://scripts/world/resource_node.gd" id="1_resnode"]
+[ext_resource type="Script" uid="uid://b8ktlq8xqwd8x" path="res://scripts/combat/health.gd" id="2_health"]
+
+[sub_resource type="SphereMesh" id="SphereMesh_rock"]
+radius = 0.7
+height = 1.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rock"]
+albedo_color = Color(0.45, 0.45, 0.48, 1)
+roughness = 0.7
+metallic = 0.1
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_col"]
+radius = 0.65
+
+[node name="Rock" type="StaticBody3D"]
+collision_layer = 1
+collision_mask = 0
+script = ExtResource("1_resnode")
+
+[node name="RockMesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.35, 0)
+mesh = SubResource("SphereMesh_rock")
+material_override = SubResource("StandardMaterial3D_rock")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.35, 0)
+shape = SubResource("SphereShape3D_col")
+
+[node name="Health" type="Node" parent="."]
+script = ExtResource("2_health")

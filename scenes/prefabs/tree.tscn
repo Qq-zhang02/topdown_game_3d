@@ -1,0 +1,47 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" uid="uid://dyfk6gr3xdpb3" path="res://scripts/world/resource_node.gd" id="1_resnode"]
+[ext_resource type="Script" uid="uid://b8ktlq8xqwd8x" path="res://scripts/combat/health.gd" id="2_health"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_trunk"]
+top_radius = 0.12
+bottom_radius = 0.18
+height = 1.4
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_trunk"]
+albedo_color = Color(0.4, 0.26, 0.13, 1)
+roughness = 0.9
+
+[sub_resource type="SphereMesh" id="SphereMesh_leaves"]
+radius = 0.95
+height = 1.9
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_leaves"]
+albedo_color = Color(0.18, 0.45, 0.15, 1)
+roughness = 0.85
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_col"]
+radius = 0.3
+height = 1.6
+
+[node name="Tree" type="StaticBody3D"]
+collision_layer = 1
+collision_mask = 0
+script = ExtResource("1_resnode")
+
+[node name="Trunk" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)
+mesh = SubResource("CylinderMesh_trunk")
+material_override = SubResource("StandardMaterial3D_trunk")
+
+[node name="Leaves" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.9, 0)
+mesh = SubResource("SphereMesh_leaves")
+material_override = SubResource("StandardMaterial3D_leaves")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+shape = SubResource("CylinderShape3D_col")
+
+[node name="Health" type="Node" parent="."]
+script = ExtResource("2_health")

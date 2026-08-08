@@ -46,6 +46,9 @@ func setup(spot: SpotLight3D, omni: OmniLight3D, inventory: Node) -> void:
 
 
 func _process(delta: float) -> void:
+	# 防御：setup() 调用前数组未初始化（场景化后 _process 可能先运行）
+	if _cons_cooldowns.size() < CONSUMABLE_SLOTS:
+		return
 	for i in range(CONSUMABLE_SLOTS):
 		if _cons_cooldowns[i] > 0.0:
 			_cons_cooldowns[i] = maxf(_cons_cooldowns[i] - delta, 0.0)

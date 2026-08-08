@@ -1,6 +1,36 @@
-[gd_scene format=3 uid="uid://c3dmain0001"]
+[gd_scene load_steps=4 format=3 uid="uid://c3dmain0001"]
 
 [ext_resource type="Script" uid="uid://bovy7fk3olqr5" path="res://scripts/world_3d.gd" id="1_world"]
+[ext_resource type="PackedScene" path="res://models/landscape/地形.glb" id="2_terrain"]
+
+[sub_resource type="Environment" id="Environment_world"]
+ambient_light_source = 2
+ambient_light_color = Color(0.35, 0.38, 0.45, 1)
+background_mode = 1
+background_color = Color(0.12, 0.18, 0.28, 1)
+ssao_enabled = true
+ssao_light_affect = 0.3
+glow_enabled = false
 
 [node name="World3D" type="Node3D" unique_id=857670015]
 script = ExtResource("1_world")
+
+[node name="SunLight" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-90, 30, 0)
+light_energy = 1.0
+shadow_enabled = true
+
+[node name="MoonLight" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(90, 210, 0)
+light_color = Color(0.45, 0.55, 0.85, 1)
+light_energy = 0.0
+
+[node name="WorldEnv" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_world")
+
+[node name="Terrain" type="Node3D" parent="."]
+
+[node name="TerrainModel" parent="Terrain" instance=ExtResource("2_terrain")]
+
+[node name="TerrainBody" type="StaticBody3D" parent="Terrain"]
+collision_layer = 1

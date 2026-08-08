@@ -1,7 +1,8 @@
 extends Node3D
 class_name Pickup
 ## 地面掉落物：发光小方块 + 名称标签，玩家走近自动拾取
-## 材料进背包；装备/武器直接进装备管理器
+## 所有物品统一进背包
+## 外观由 scenes/prefabs/pickup.tscn 定义（编辑器可视化），预制体缺失时回退空节点
 
 var item: Resource
 var count: int = 1
@@ -21,61 +22,57 @@ var _label: Label3D
 static func spawn(parent: Node, item_res: Resource, amount: int, pos: Vector3) -> void:
 	if item_res == null:
 		return
-	var p := Pickup.new()
+	var p: Pickup = null
+	const PREFAB := "res://scenes/prefabs/pickup.tscn"
+	if ResourceLoader.exists(PREFAB):
+		var ps: PackedScene = load(PREFAB)
+		if ps:
+			p = ps.instantiate() as Pickup
+	if p == null:
+		p = Pickup.new()
+
 	p.item = item_res
 	p.count = amount
 	p.position = pos + Vector3(randf_range(-0.3, 0.3), 2.0, randf_range(-0.3, 0.3))
 	parent.add_child(p)
-	p._build()
+	p._init_drop()
 
 
-func _build() -> void:
-	_mesh = MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = Vector3(0.32, 0.32, 0.32)
-	_mesh.mesh = box
-	var mat := StandardMaterial3D.new()
-	var c: Color = item.get("ui_color")
-	mat.albedo_color = c
-	mat.emission_enabled = true
-	mat.emission = c
-	mat.emission_energy_multiplier = 0.6
-	_mesh.material_override = mat
-	add_child(_mesh)
+func _init_drop() -> void:
+	# 从预制体获取节点引用
+	_mesh = get_node_or_null("Mesh") as MeshInstance3D
+	_label = get_node_or_null("Label") as Label3D
+	_area = get_node_or_null("Area") as Area3D
 
-	_label = Label3D.new()
-	_label.position = Vector3(0, 0.55, 0)
-	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_label.font_size = 48
-	_label.pixel_size = 0.008
-	_label.outline_size = 8
-	_label.modulate = Color(1, 1, 1, 0.95)
+	# 覆盖材质颜色/发光（依赖运行时的 item.ui_color）
+	if _mesh:
+		var c: Color = item.get("ui_color")
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = c
+		mat.emission_enabled = true
+		mat.emission = c
+		mat.emission_energy_multiplier = 0.6
+		_mesh.material_override = mat
+
 	_update_label()
-	add_child(_label)
 
-	var area := Area3D.new()
-	area.collision_layer = 0
-	area.collision_mask = 1  # 玩家
-	var col := CollisionShape3D.new()
-	var sph := SphereShape3D.new()
-	sph.radius = 1.1
-	col.shape = sph
-	area.add_child(col)
-	add_child(area)
-	area.body_entered.connect(_on_body_entered)
-	_area = area
+	if _area and not _area.body_entered.is_connected(_on_body_entered):
+		_area.body_entered.connect(_on_body_entered)
 
 	_base_y = position.y
 
 	# 探测地表高度作为落地目标
-	var space := get_world_3d().direct_space_state
-	var q := PhysicsRayQueryParameters3D.create(Vector3(position.x, 100.0, position.z), Vector3(position.x, -100.0, position.z))
-	q.collision_mask = 1
-	var hit := space.intersect_ray(q)
-	var ground_y: float = hit.position.y if not hit.is_empty() else 0.2
+	var ground_y: float = 0.2
+	if get_world_3d():
+		var space := get_world_3d().direct_space_state
+		var q := PhysicsRayQueryParameters3D.create(Vector3(position.x, 100.0, position.z), Vector3(position.x, -100.0, position.z))
+		q.collision_mask = 1
+		var hit := space.intersect_ray(q)
+		ground_y = hit.position.y if not hit.is_empty() else 0.2
 
 	# 掉落动画：先禁用拾取，落地弹跳+滑行后才可拾取
-	area.monitoring = false
+	if _area:
+		_area.monitoring = false
 	var tween := create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(self, "position:y", ground_y + 0.2, 0.6).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
@@ -87,7 +84,8 @@ func _build() -> void:
 
 
 func _update_label() -> void:
-	_label.text = "%s x%d" % [item.get("display_name"), count]
+	if _label:
+		_label.text = "%s x%d" % [item.get("display_name"), count]
 
 
 func _process(delta: float) -> void:
@@ -97,14 +95,16 @@ func _process(delta: float) -> void:
 		target.y = global_position.y
 		var dist := global_position.distance_to(target)
 		global_position = global_position.move_toward(target, _fly_speed * delta)
-		_mesh.rotation.y += delta * 6.0
+		if _mesh:
+			_mesh.rotation.y += delta * 6.0
 		scale = Vector3.ONE * clamp(dist / 1.5, 0.05, 1.0)
 		if dist < 0.3:
 			_do_pickup(_flying_to)
 		return
 
 	# 掉落动画期间只旋转，不做浮动
-	_mesh.rotation.y += delta * 2.0
+	if _mesh:
+		_mesh.rotation.y += delta * 2.0
 	if not _can_pickup:
 		return
 
@@ -116,7 +116,8 @@ func _process(delta: float) -> void:
 func _on_drop_finished() -> void:
 	_base_y = position.y
 	_can_pickup = true
-	_area.monitoring = true
+	if _area:
+		_area.monitoring = true
 
 
 func _on_body_entered(body: Node3D) -> void:
@@ -137,7 +138,8 @@ func _on_body_entered(body: Node3D) -> void:
 
 	# 开始飞向玩家
 	_flying_to = body
-	_area.monitoring = false
+	if _area:
+		_area.monitoring = false
 
 
 func _do_pickup(body: Node3D) -> void:

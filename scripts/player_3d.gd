@@ -62,9 +62,12 @@ func _create_model() -> void:
 	if not scene:
 		return
 
+	var placeholder: Node3D = get_node_or_null("CharacterModel")
+	if not placeholder:
+		return
 	_model_root = scene.instantiate()
-	_model_root.name = "CharacterModel"
-	add_child(_model_root)
+	_model_root.name = "CharacterModelInstance"
+	placeholder.add_child(_model_root)
 
 	_apply_skin(_model_path)
 
@@ -114,28 +117,21 @@ func _apply_skin(model_path: String) -> void:
 
 
 func _create_collision() -> void:
-	if not _model_root:
-		var col := CollisionShape3D.new()
-		var shape := CapsuleShape3D.new()
-		shape.radius = 0.4
-		shape.height = 1.6
-		col.shape = shape
+	# 场景中已预置 CollisionShape3D（Capsule 0.4/1.6），此处按模型 AABB 精调
+	var col: CollisionShape3D = get_node_or_null("CollisionShape3D")
+	if not col:
+		col = CollisionShape3D.new()
 		add_child(col)
-		_collision_shape = col
-		return
+	_collision_shape = col
+
+	if not _model_root:
+		return  # 保留场景默认碰撞体
 
 	var aabb := _get_model_aabb(_model_root)
 	if aabb.size.length_squared() < 0.1:
-		var col := CollisionShape3D.new()
-		var shape := CapsuleShape3D.new()
-		shape.radius = 0.4
-		shape.height = 1.6
-		col.shape = shape
-		add_child(col)
-		_collision_shape = col
-		return
+		return  # 模型 AABB 过小，保留默认
 
-	var col := CollisionShape3D.new()
+	# 新建 shape 赋值（避免 mutate 场景共享资源）
 	var shape := CapsuleShape3D.new()
 	shape.radius = max(aabb.size.x, aabb.size.z) * 0.45
 	shape.height = aabb.size.y * 0.85
@@ -143,8 +139,6 @@ func _create_collision() -> void:
 	# AABB.position 是最小角而非中心，必须用 get_center() 或 position + size/2
 	# to_local 确保在世界坐标->本地坐标正确转换
 	col.position = to_local(aabb.position + aabb.size * 0.5)
-	add_child(col)
-	_collision_shape = col
 
 
 # ═══════════════════════════════════════════
@@ -253,11 +247,7 @@ func _on_anim_finished(anim_name: String) -> void:
 # ═══════════════════════════════════════════
 
 func _create_inventory() -> void:
-	var InvScript := load("res://scripts/inventory/inventory.gd")
-	_inventory = Node.new()
-	_inventory.set_script(InvScript)
-	_inventory.name = "Inventory"
-	add_child(_inventory)
+	_inventory = $Inventory
 
 
 # ═══════════════════════════════════════════
@@ -265,22 +255,8 @@ func _create_inventory() -> void:
 # ═══════════════════════════════════════════
 
 func _create_lights_and_equipment() -> void:
-	var spot := SpotLight3D.new()
-	spot.name = "SpotLight"
-	spot.visible = false
-	add_child(spot)
-
-	var omni := OmniLight3D.new()
-	omni.name = "OmniLight"
-	omni.visible = false
-	add_child(omni)
-
-	var MgrScript := load("res://scripts/equipment_manager.gd")
-	_equipment_mgr = Node.new()
-	_equipment_mgr.set_script(MgrScript)
-	_equipment_mgr.name = "EquipmentManager"
-	_equipment_mgr.setup(spot, omni, _inventory)
-	add_child(_equipment_mgr)
+	_equipment_mgr = $EquipmentManager
+	_equipment_mgr.setup($SpotLight, $OmniLight, _inventory)
 
 
 # ═══════════════════════════════════════════
@@ -288,19 +264,8 @@ func _create_lights_and_equipment() -> void:
 # ═══════════════════════════════════════════
 
 func _create_survival() -> void:
-	var HealthScript := load("res://scripts/combat/health.gd")
-	_health = Node.new()
-	_health.set_script(HealthScript)
-	_health.name = "Health"
-	_health.set("max_hp", 100.0)
-	add_child(_health)
+	_health = $Health
 	_health.died.connect(_on_died)
-
-	var MeleeScript := load("res://scripts/combat/melee_controller.gd")
-	var melee := Node.new()
-	melee.set_script(MeleeScript)
-	melee.name = "MeleeController"
-	add_child(melee)
 
 	# 初始物资 → 先进背包再装备
 	var ItemDBScript := load("res://scripts/core/item_db.gd")

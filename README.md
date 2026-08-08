@@ -1,4 +1,4 @@
-# TopDownGame3D v3.4.2
+# TopDownGame3D v3.5.0
 
 > Godot 4.7.1 · 俯视角 3D · 全 GDScript · 2026-07-26
 
@@ -20,8 +20,13 @@ GitHub (私密)：`https://github.com/Qq-zhang02/topdown_game_3d`
 topdown_game_3d-v3/
 ├── project.godot
 ├── scenes/
-│   ├── main.tscn              # 入口 (Node3D → world_3d.gd)
-│   └── player.tscn            # 玩家 (CharacterBody3D → player_3d.gd)
+│   ├── main.tscn              # ★ 入口：地形/光照/环境可视化摆放 (Node3D → world_3d.gd)
+│   ├── player.tscn            # ★ 玩家：模型占位/碰撞/灯光/子系统节点编辑器摆放
+│   └── prefabs/               # ★ 实体预制体（编辑器可视化编辑外观）
+│       ├── tree.tscn / rock.tscn          # 资源节点（外观可编辑，位置代码随机）
+│       ├── pickup.tscn                    # 掉落物
+│       ├── obstacle.tscn                  # 障碍物（单位尺寸，运行时缩放）
+│       └── building_campfire / building_foundation / building_wooden_wall.tscn
 ├── data/                      # ★ 数据驱动内容：新增物品/建筑 = 加 .tres，零代码
 │   ├── items/                 # 物品（ItemDB 自动扫描，按 id 取用）
 │   │   ├── wood.tres / stone.tres / meat.tres
@@ -699,7 +704,45 @@ world_3d._restore_from_save()  → 恢复位置/血量/背包/建筑/昼夜
 
 ---
 
-## 11. 注意事项
+## 11. 场景可视化（v3.5.0+）
+
+v3.5.0 将原先纯代码生成的 3D 内容场景化，**大部分内容现在可在 Godot 编辑器中直接编辑**：
+
+### 可在编辑器中可视化编辑
+
+| 内容 | 位置 | 说明 |
+|------|------|------|
+| 地形 / 光照 / 环境 | `scenes/main.tscn` | Terrain（地形模型）、SunLight、MoonLight、WorldEnv 均为场景节点，可直接调整位置/旋转/参数 |
+| 玩家结构 | `scenes/player.tscn` | 模型占位、碰撞体、手电筒/火把灯光、Inventory/Health/MeleeController/EquipmentManager 均为场景子节点 |
+| 树 / 石头 | `scenes/prefabs/tree.tscn` / `rock.tscn` | mesh、材质、碰撞体可编辑；位置仍由代码随机生成 |
+| 掉落物 | `scenes/prefabs/pickup.tscn` | 模型、标签、拾取区可编辑；颜色/标签文本运行时按物品覆盖 |
+| 障碍物 | `scenes/prefabs/obstacle.tscn` | 单位尺寸（1×1×1），运行时按随机尺寸缩放；材质运行时覆盖 |
+| 建筑外观 | `scenes/prefabs/building_*.tscn` | 篝火/木地基/木墙；`BuildingData.scene_path` 指向预制体，可加自定义 mesh/粒子 |
+| 物品/建筑数值 | `data/items/*.tres`、`data/buildings/*.tres` | 检查器直接编辑（伤害、回血、成本、尺寸等） |
+
+### 保留代码生成的部分
+
+- **障碍物/树/石头/动物的位置** — 代码随机生成（保持每局布局随机性），外观来自预制体
+- **动物** — 模型多样（24 种），仍为代码生成（可仿照资源节点预制体化）
+- **UI（背包/装备栏/建造菜单）** — 全代码生成
+
+### 预制体架构
+
+```
+场景加载时:
+  main.tscn 提供 Terrain + 光照/环境
+  world_3d._create_ground()  → _fit_terrain() 居中缩放 + 运行时构建地形碰撞
+  world_3d._create_obstacles() → instantiate obstacle.tscn + 随机尺寸/材质
+  resource_node.spawn()       → instantiate tree.tscn / rock.tscn（位置随机）
+  pickup.spawn()              → instantiate pickup.tscn
+  place_building()            → 优先 instantiate building_*.tscn（scene_path），空则回退 BoxMesh
+```
+
+**回退机制**：所有预制体加载失败时自动回退到程序化构建（BoxMesh 等），保证可运行。
+
+---
+
+## 12. 注意事项
 
 - **导出的 .remap 后缀**：导出包里 DirAccess 列出的文件是 `xxx.tres.remap`，扫描目录时必须 `trim_suffix(".remap")` 再判断和加载（ItemDB / BuildController 已处理）
 - **Object.get 冲突**：自定义静态方法不能叫 `get`（与原生冲突），ItemDB 用 `get_item`

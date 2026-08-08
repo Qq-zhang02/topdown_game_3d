@@ -13,6 +13,7 @@ cost = {
 "wood": 5,
 "stone": 3
 }
+scene_path = "res://scenes/prefabs/building_campfire.tscn"
 emits_light = true
 light_color = Color(1, 0.6, 0.2, 1)
 light_energy = 3.5

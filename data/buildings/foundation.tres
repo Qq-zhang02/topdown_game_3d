@@ -12,3 +12,4 @@ color = Color(0.6, 0.45, 0.25, 1)
 cost = {
 "wood": 6
 }
+scene_path = "res://scenes/prefabs/building_foundation.tscn"

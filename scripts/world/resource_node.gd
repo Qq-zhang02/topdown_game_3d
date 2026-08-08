@@ -2,10 +2,10 @@ extends StaticBody3D
 class_name ResourceNode
 ## 可采集资源节点：树（掉木材）/ 石头（掉石头）
 ## 近战攻击削减血量，血量归零后爆掉落物并消失
+## 外观由 scenes/prefabs/ 下预制体定义（编辑器可视化），预制体缺失时回退程序化构建
 
 const ItemDBClass := preload("res://scripts/core/item_db.gd")
 const PickupClass := preload("res://scripts/combat/pickup.gd")
-const HealthClass := preload("res://scripts/combat/health.gd")
 
 var drop_id: String = ""
 var drop_min: int = 2
@@ -15,100 +15,84 @@ var occupied_aabb: AABB  # 占地区域，销毁时通知世界释放
 
 ## kind: "tree" | "rock"
 static func spawn(parent: Node, kind: String, pos: Vector3) -> ResourceNode:
-	var node := ResourceNode.new()
+	var node: ResourceNode = null
+	var scene_path := "res://scenes/prefabs/tree.tscn" if kind == "tree" else "res://scenes/prefabs/rock.tscn"
+	if ResourceLoader.exists(scene_path):
+		var ps: PackedScene = load(scene_path)
+		if ps:
+			node = ps.instantiate() as ResourceNode
+
+	if node == null:
+		# 回退：程序化构建（预制体缺失时）
+		node = ResourceNode.new()
+		node._fallback_build(kind)
+
 	node.name = "Resource_" + kind
 	node.position = pos
 	node.collision_layer = 1
 	node.collision_mask = 0
 	node.add_to_group("damageable")
-	parent.add_child(node)
 
 	match kind:
 		"tree":
 			node.drop_id = "wood"
 			node.drop_min = 2
 			node.drop_max = 4
-			node._build_tree()
-			node._add_health(40.0, Color(0.40, 0.26, 0.13), 0.3)
 		"rock":
 			node.drop_id = "stone"
 			node.drop_min = 2
 			node.drop_max = 4
-			node._build_rock()
-			node._add_health(60.0, Color(0.45, 0.45, 0.48))
+
+	# Health 参数在 add_child 前设置（Health._ready() 会快照 hp = max_hp）
+	var health_node: Node = node.get_node_or_null("Health")
+	if health_node:
+		if kind == "tree":
+			health_node.set("max_hp", 40.0)
+			health_node.set_particle_color(Color(0.40, 0.26, 0.13))
+			health_node.set_particle_offset_scale(0.3)
+		else:
+			health_node.set("max_hp", 60.0)
+			health_node.set_particle_color(Color(0.45, 0.45, 0.48))
+		if not health_node.died.is_connected(node._on_died):
+			health_node.died.connect(node._on_died)
+
+	parent.add_child(node)
+	node._compute_occupied()
 	return node
 
 
-func _build_tree() -> void:
-	var trunk := MeshInstance3D.new()
-	var trunk_mesh := CylinderMesh.new()
-	trunk_mesh.top_radius = 0.12
-	trunk_mesh.bottom_radius = 0.18
-	trunk_mesh.height = 1.4
-	trunk.mesh = trunk_mesh
-	trunk.position = Vector3(0, 0.7, 0)
-	var trunk_mat := StandardMaterial3D.new()
-	trunk_mat.albedo_color = Color(0.40, 0.26, 0.13)
-	trunk_mat.roughness = 0.9
-	trunk.material_override = trunk_mat
-	add_child(trunk)
+func _compute_occupied() -> void:
+	if drop_id == "wood":
+		occupied_aabb = AABB(global_position + Vector3(-0.6, 0, -0.6), Vector3(1.2, 3, 1.2))
+	else:
+		occupied_aabb = AABB(global_position + Vector3(-0.8, 0, -0.8), Vector3(1.6, 1.2, 1.6))
 
-	var leaves := MeshInstance3D.new()
-	var leaves_mesh := SphereMesh.new()
-	leaves_mesh.radius = 0.95
-	leaves_mesh.height = 1.9
-	leaves.mesh = leaves_mesh
-	leaves.position = Vector3(0, 1.9, 0)
-	var leaves_mat := StandardMaterial3D.new()
-	leaves_mat.albedo_color = Color(0.18, 0.45, 0.15)
-	leaves_mat.roughness = 0.85
-	leaves.material_override = leaves_mat
-	add_child(leaves)
+
+## 回退构建：预制体加载失败时的简易外观 + 碰撞 + Health
+func _fallback_build(kind: String) -> void:
+	var mesh := MeshInstance3D.new()
+	var m := SphereMesh.new()
+	m.radius = 0.6
+	m.height = 1.2
+	mesh.mesh = m
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.40, 0.35, 0.3)
+	mesh.material_override = mat
+	mesh.position = Vector3(0, 0.6, 0)
+	add_child(mesh)
 
 	var col := CollisionShape3D.new()
 	var shape := CylinderShape3D.new()
-	shape.radius = 0.3
-	shape.height = 1.6
+	shape.radius = 0.4
+	shape.height = 1.2
 	col.shape = shape
-	col.position = Vector3(0, 0.8, 0)
+	col.position = Vector3(0, 0.6, 0)
 	add_child(col)
 
-	occupied_aabb = AABB(global_position + Vector3(-0.6, 0, -0.6), Vector3(1.2, 3, 1.2))
-
-
-func _build_rock() -> void:
-	var rock := MeshInstance3D.new()
-	var rock_mesh := SphereMesh.new()
-	rock_mesh.radius = 0.7
-	rock_mesh.height = 1.0
-	rock.mesh = rock_mesh
-	rock.position = Vector3(0, 0.35, 0)
-	var rock_mat := StandardMaterial3D.new()
-	rock_mat.albedo_color = Color(0.45, 0.45, 0.48)
-	rock_mat.roughness = 0.7
-	rock_mat.metallic = 0.1
-	rock.material_override = rock_mat
-	add_child(rock)
-
-	var col := CollisionShape3D.new()
-	var shape := SphereShape3D.new()
-	shape.radius = 0.65
-	col.shape = shape
-	col.position = Vector3(0, 0.35, 0)
-	add_child(col)
-
-	occupied_aabb = AABB(global_position + Vector3(-0.8, 0, -0.8), Vector3(1.6, 1.2, 1.6))
-
-
-func _add_health(hp: float, pc: Color = Color.WHITE, offset_s: float = 1.0) -> void:
 	var health := Node.new()
-	health.set_script(HealthClass)
 	health.name = "Health"
-	health.set("max_hp", hp)
-	health.set_particle_color(pc)
-	health.set_particle_offset_scale(offset_s)
+	health.set_script(preload("res://scripts/combat/health.gd"))
 	add_child(health)
-	health.died.connect(_on_died)
 
 
 func _on_died() -> void:

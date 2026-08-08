@@ -1,6 +1,37 @@
-[gd_scene load_steps=2 format=3 uid="uid://c3dplayer01"]
+[gd_scene load_steps=7 format=3 uid="uid://c3dplayer01"]
 
-[ext_resource type="Script" path="res://scripts/player_3d.gd" id="1_player"]
+[ext_resource type="Script" uid="uid://d0mtxcjyarinx" path="res://scripts/player_3d.gd" id="1_player"]
+[ext_resource type="Script" uid="uid://ch2jq4y02kw8t" path="res://scripts/inventory/inventory.gd" id="2_inv"]
+[ext_resource type="Script" uid="uid://b8ktlq8xqwd8x" path="res://scripts/combat/health.gd" id="3_health"]
+[ext_resource type="Script" uid="uid://cs4aad500e4bp" path="res://scripts/combat/melee_controller.gd" id="4_melee"]
+[ext_resource type="Script" uid="uid://dv0pmsiyfcs4b" path="res://scripts/equipment_manager.gd" id="5_equip"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
+radius = 0.4
+height = 1.6
 
 [node name="Player3D" type="CharacterBody3D"]
 script = ExtResource("1_player")
+
+[node name="CharacterModel" type="Node3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape3D_body")
+
+[node name="SpotLight" type="SpotLight3D" parent="."]
+visible = false
+
+[node name="OmniLight" type="OmniLight3D" parent="."]
+visible = false
+
+[node name="Inventory" type="Node" parent="."]
+script = ExtResource("2_inv")
+
+[node name="Health" type="Node" parent="."]
+script = ExtResource("3_health")
+
+[node name="MeleeController" type="Node" parent="."]
+script = ExtResource("4_melee")
+
+[node name="EquipmentManager" type="Node" parent="."]
+script = ExtResource("5_equip")
