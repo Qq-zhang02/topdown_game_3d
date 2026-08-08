@@ -139,7 +139,7 @@ world_3d._ready()
 | `rotation_lag` | 0.0 | 转向迟滞（武器可加，最高 0.95） |
 | `vision_range` | 6.0 | 视力距离，瞄准时摄像机最大偏移量 |
 
-**击中判定碰撞体：** `CapsuleShape3D`（radius=0.4, height=1.6），基于模型 AABB 自动适配。
+**玩家碰撞体：** `scenes/player.tscn` 中的 `CollisionShape3D`（默认 `CapsuleShape3D` radius=0.4, height=1.6）。**场景优先**：场景中已配置的碰撞体完全采用编辑器里的形状/位置（所见即所得）；仅当场景缺失碰撞节点时才回退到基于模型 AABB 自动计算。
 
 ### 瞄准减速
 
@@ -744,6 +744,8 @@ v3.5.0 将原先纯代码生成的 3D 内容场景化，**大部分内容现在�
 | 障碍物 | `scenes/prefabs/obstacle.tscn` | 单位尺寸（1×1×1），运行时按随机尺寸缩放；材质运行时覆盖 |
 | 建筑外观 | `scenes/prefabs/building_*.tscn` | 篝火/木地基/木墙；`BuildingData.scene_path` 指向预制体，可加自定义 mesh/粒子 |
 | 物品/建筑数值 | `data/items/*.tres`、`data/buildings/*.tres` | 检查器直接编辑（伤害、回血、成本、尺寸等） |
+
+**碰撞体优先级（玩家/资源/障碍物）：** 在 `.tscn` 中手动调整的 `CollisionShape3D`（形状/位置/大小）即最终碰撞体积，**完全可视化编辑、所见即所得**；仅当场景中没有对应碰撞节点时才回退到基于 mesh AABB 的自动计算。
 
 ### 装备光源职责划分
 
