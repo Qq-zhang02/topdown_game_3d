@@ -5,7 +5,7 @@ class_name StartScreen
 # ── 角色数据表 ──
 # 加新角色只需加一行：{id="xxx", name="显示名", path="模型路径"}
 const CHARACTERS := [
-	{id="archer", name="弓箭手", path="res://models/character/character-archer.glb", skin="res://models/character/colormap.png"},
+	{id="archer", name="弓箭手", path="res://models/character/character-archer.glb", skin="res://models/character/Textures/colormap.png"},
 ]
 
 signal started(selected_model_path: String, selected_skin_path: String, save_slot: int)

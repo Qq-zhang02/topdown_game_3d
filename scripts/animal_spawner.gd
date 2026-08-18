@@ -1,6 +1,7 @@
 extends Node
 class_name AnimalSpawner
 ## 在世界中随机生成小动物（RigidBody3D，可被玩家推动）
+## 行为逻辑见 scripts/animal_behavior.gd：白天随机动画+walk散步，夜间狂暴run追击+近身跳跃攻击
 
 @export var count: int = 30
 @export var min_scale: float = 0.4
@@ -86,6 +87,9 @@ func _spawn_animal(model_name: String, pos: Vector3, scale_val: float, rot_y: fl
 	body.linear_damp = 0.6
 	body.angular_damp = 0.9
 	body.continuous_cd = true  # 连续碰撞检测，防止高速穿透薄地面
+	body.axis_lock_angular_x = true  # 朝向由 Model 子节点控制，锁定刚体自身旋转
+	body.axis_lock_angular_y = true
+	body.axis_lock_angular_z = true
 	add_child(body)
 
 	var model_root: Node3D = scene.instantiate()
@@ -103,13 +107,15 @@ func _spawn_animal(model_name: String, pos: Vector3, scale_val: float, rot_y: fl
 	col.position = Vector3(0, shape.height * 0.5, 0)
 	body.add_child(col)
 
-	# 挂载随机弹跳行为
+	# 挂载动画行为：白天随机动作+walk散步，夜间run追击+近身跳跃攻击
 	var BehaviorScript := load("res://scripts/animal_behavior.gd")
 	var behavior := Node.new()
 	behavior.set_script(BehaviorScript)
 	behavior.name = "Behavior"
-	behavior.set("hop_impulse", randf_range(1.5, 3.0))
-	behavior.set("hop_up", randf_range(2.5, 5.0))
+	behavior.set("walk_speed", randf_range(1.0, 2.0))
+	behavior.set("min_action_interval", randf_range(1.0, 2.5))
+	behavior.set("max_action_interval", randf_range(3.0, 5.0))
+	behavior.set("night_run_speed", randf_range(4.5, 5.8))
 	behavior.set("world_boundary", _world_half - 1.0)  # 边界安全距离
 	body.add_child(behavior)
 

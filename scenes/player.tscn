@@ -26,8 +26,7 @@ shape = SubResource("CapsuleShape3D_smehm")
 debug_color = Color(0, 0.43137255, 0.5058824, 0.65882355)
 
 [node name="SpotLight" type="SpotLight3D" parent="." unique_id=1319968345]
-transform = Transform3D(1, 0, 0, 0, 0.9884217, 0.15173215, 0, -0.15173215, 0.9884217, 0, 0.31, -0.25894728)
-visible = false
+transform = Transform3D(1, 0, 0, 0, 0.9884217, 0.15173215, 0, -0.15173215, 0.9884217, 0, 0.33596605, -0.32304212)
 
 [node name="OmniLight" type="OmniLight3D" parent="." unique_id=1078076314]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.42534935, 1.9725574, -0.45434338)

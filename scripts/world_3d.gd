@@ -63,7 +63,7 @@ func _on_load_game(save_data: Dictionary, slot: int) -> void:
 	_remove_save_select()
 
 	var model_path: String = save_data.get("character_model", "res://models/character/character-archer.glb")
-	var skin_path: String = save_data.get("character_skin", "res://models/character/colormap.png")
+	var skin_path: String = save_data.get("character_skin", "res://models/character/Textures/colormap.png")
 
 	_on_game_started(model_path, skin_path, slot)
 
@@ -506,6 +506,9 @@ func _spawn_single_animal() -> void:
 	body.linear_damp = 0.6
 	body.angular_damp = 0.9
 	body.continuous_cd = true
+	body.axis_lock_angular_x = true  # 朝向由 Model 子节点控制，锁定刚体自身旋转
+	body.axis_lock_angular_y = true
+	body.axis_lock_angular_z = true
 	add_child(body)
 
 	var model_root: Node3D = scene.instantiate()
@@ -526,8 +529,10 @@ func _spawn_single_animal() -> void:
 	var behavior := Node.new()
 	behavior.set_script(BehaviorScript)
 	behavior.name = "Behavior"
-	behavior.set("hop_impulse", randf_range(1.5, 3.0))
-	behavior.set("hop_up", randf_range(2.5, 5.0))
+	behavior.set("walk_speed", randf_range(1.0, 2.0))
+	behavior.set("min_action_interval", randf_range(1.0, 2.5))
+	behavior.set("max_action_interval", randf_range(3.0, 5.0))
+	behavior.set("night_run_speed", randf_range(4.5, 5.8))
 	behavior.set("world_boundary", WORLD_HALF - 1.0)
 	body.add_child(behavior)
 

@@ -7,7 +7,7 @@ signal new_game(slot: int)
 
 const MAX_SLOTS := 5
 const DEFAULT_MODEL := "res://models/character/character-archer.glb"
-const DEFAULT_SKIN := "res://models/character/colormap.png"
+const DEFAULT_SKIN := "res://models/character/Textures/colormap.png"
 
 # 动画预览列表
 const PREVIEW_ANIMS := [

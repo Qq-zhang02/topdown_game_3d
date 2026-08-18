@@ -416,11 +416,12 @@ func _apply_utility() -> void:
 	var eq := get_utility_at(_utility_index)
 	if eq == null:
 		_turn_off_all()
-		_set_player_lag(0.0)
+		# 功能装备不提供转向迟滞；切换后重新应用当前武器的迟滞，避免把武器迟滞清掉
+		_apply_weapon()
 		return
 
 	_turn_off_all()
-	_set_player_lag(0.0)
+	_apply_weapon()
 
 	var light_type = eq.get("light_type")
 	if light_type == EquipmentScript.LightType.SPOT:

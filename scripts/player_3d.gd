@@ -7,7 +7,8 @@ class_name Player3D
 enum AnimState { IDLE, RUN, JUMP, FALL }
 
 var _model_path: String = "res://models/character/character-archer.glb"
-var _skin_path: String = "res://models/character/colormap.png"
+const DEFAULT_SKIN := "res://models/character/Textures/colormap.png"
+var _skin_path: String = DEFAULT_SKIN
 
 @export var speed: float = 4.0
 @export var jump_velocity: float = 15.0
@@ -108,7 +109,9 @@ func _get_model_aabb(node: Node3D) -> AABB:
 ## 为 FBX 模型（无内嵌贴图）应用皮肤纹理
 func _apply_skin(model_path: String) -> void:
 	if _skin_path.is_empty() or not ResourceLoader.exists(_skin_path):
-		return
+		_skin_path = DEFAULT_SKIN
+		if not ResourceLoader.exists(_skin_path):
+			return
 	var tex: Texture2D = load(_skin_path)
 	if not tex:
 		return
@@ -128,7 +131,9 @@ func _apply_skin(model_path: String) -> void:
 ## 编辑器预览：给场景预置模型应用皮肤（GLB 无内嵌贴图，运行时才应用）
 func _apply_editor_preview_skin() -> void:
 	if _skin_path.is_empty() or not ResourceLoader.exists(_skin_path):
-		return
+		_skin_path = DEFAULT_SKIN
+		if not ResourceLoader.exists(_skin_path):
+			return
 	var tex: Texture2D = load(_skin_path)
 	if not tex:
 		return
