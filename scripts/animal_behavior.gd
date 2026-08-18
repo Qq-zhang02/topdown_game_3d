@@ -9,7 +9,7 @@ class_name AnimalBehavior
 @export var walk_speed: float = 1.5            # 白天散步速度（m/s）
 @export var min_walk_duration: float = 1.5     # 最短散步时长
 @export var max_walk_duration: float = 4.0     # 最长散步时长
-@export var day_walk_chance: float = 0.45      # 停止后选择去散步的概率
+@export var day_walk_chance: float = 0.6      # 停止后选择去散步的概率
 @export var min_action_interval: float = 1.5   # 静止动作最短保持时长
 @export var max_action_interval: float = 4.0   # 静止动作最长保持时长
 @export var turn_speed: float = 12.0           # 朝向转动速度
@@ -27,12 +27,13 @@ const NIGHT_JUMP_RANGE: float = 3.0             # 进入跳跃攻击的近距离
 const NIGHT_HOP_IMPULSE: float = 6.0            # 夜间跳跃水平冲量（原跳跃攻击）
 const NIGHT_HOP_UP: float = 5.0                 # 夜间跳跃垂直冲量
 const NIGHT_LANDING_RANGE: float = 1.0          # 落地攻击判定半径
-const NIGHT_LANDING_DAMAGE: float = 5.0         # 落地攻击伤害
+const NIGHT_LANDING_DAMAGE: float = 1.0         # 落地攻击伤害
 const NIGHT_JUMP_COOLDOWN: float = 1.5          # 两次跳跃攻击的间隔
 const NIGHT_START_HOUR: float = 19.0
 const NIGHT_END_HOUR: float = 6.0
 
 @export var post_attack_pause: float = 1.0      # 发动一次攻击后原地停留的时间（秒）
+@export var lava_sink_speed: float = 1.0        # 掉进岩浆后的下沉速度（与玩家一致）
 @export var night_run_speed: float = 5.0        # 夜间狂暴追击速度（略快于玩家）
 @export var world_boundary: float = 49.0
 @export var max_linear_velocity: float = 20.0
@@ -41,8 +42,13 @@ const PUSH_DISTANCE: float = 0.6
 const TURN_READY_ANGLE: float = deg_to_rad(8.0)  # 朝向误差小于该角度后才开始移动
 const JUMP_WINDUP_MAX: float = 0.6               # 起跳前最多转向时间（转到目标方向即可提前起跳）
 const LANDING_CHECK_DELAY: float = 0.6           # 起跳后多久判定落地伤害
+const TERRAIN_QUERY_LAYER: int = 1 << 3          # 与 world_3d.gd 中地形专用射线层一致
+const LAVA_ENTER_Y: float = 0.0                  # 动物掉到该高度且下方无地形时开始挣扎
+const LAVA_STRUGGLE_TIME: float = 1.0            # 挣扎动画持续时间
+const LAVA_DISAPPEAR_Y: float = -5.0              # 兜底：掉进岩浆下方该高度后动物消失
+const BOUNDARY_LOOKAHEAD: float = 1.2             # 边界移动统一前瞻距离
 
-enum State { DAY_ACTION, DAY_WALK, NIGHT_CHASE, NIGHT_JUMP, NIGHT_PAUSE }
+enum State { DAY_ACTION, DAY_WALK, NIGHT_CHASE, NIGHT_JUMP, NIGHT_PAUSE, NIGHT_BLOCKED }
 
 const DAY_ACTION_KEYS: Array[String] = [
 	"idle", "dance", "eat", "gesture-negative", "gesture-positive", "static",
@@ -54,6 +60,8 @@ var _model: Node3D
 var _anim_player: AnimationPlayer
 var _anim_map: Dictionary = {}  # 逻辑名（idle/walk/run/...）→ GLB 实际动画名
 var _playing_key: String = ""
+var _day_action_key: String = ""
+var _day_action_repeats_left: int = 0
 var _day_night: Node
 
 var _state: int = State.DAY_ACTION
@@ -74,6 +82,13 @@ var _jump_dir: Vector3 = Vector3.FORWARD
 var _landing_check_left: float = -1.0
 
 var _push_cooldown_left: float = 0.0
+var _dying_in_lava: bool = false
+var _lava_struggle_left: float = 0.0
+var _lava_struggle_anim: String = ""
+
+# 地形径向边界（由生成器传入，空则回退方形世界边界）
+@export var terrain_boundary: Array[float] = []
+@export var terrain_center: Vector2 = Vector2.ZERO
 
 
 func _ready() -> void:
@@ -91,6 +106,16 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	if not _body:
+		return
+
+	# 掉进岩浆后的挣扎阶段：以固定速度缓慢下沉，倒计时结束后消失
+	if _dying_in_lava:
+		var vel := _body.linear_velocity
+		vel.y = -lava_sink_speed
+		_body.linear_velocity = vel
+		_lava_struggle_left -= delta
+		if _lava_struggle_left <= 0.0:
+			_body.queue_free()
 		return
 
 	if _push_cooldown_left > 0.0:
@@ -172,14 +197,27 @@ func _play_animation(key: String, restart: bool = false) -> void:
 
 
 func _on_animation_finished(anim_name: StringName) -> void:
-	# 白天一次性动作播放完后，回到 idle 等待下一次随机选择
+	# 挣扎阶段选了 gesture-negative：1 秒内循环重播
+	if _dying_in_lava:
+		if _lava_struggle_anim == "gesture-negative" and _anim_map.has("gesture-negative") and _anim_map["gesture-negative"] == anim_name:
+			_play_animation("gesture-negative", true)
+		return
+
+	# 白天随机动作：一次性动作连续随机播放 2~3 次，再回到 idle 持续播放
 	if _state != State.DAY_ACTION:
 		return
-	if _playing_key.is_empty() or _playing_key == "idle":
+	if _day_action_key.is_empty() or _day_action_key == "idle":
 		return
-	if not _anim_map.has(_playing_key) or _anim_map[_playing_key] != anim_name:
+	if not _anim_map.has(_day_action_key) or _anim_map[_day_action_key] != anim_name:
 		return
-	_play_animation("idle", true)
+
+	if _day_action_repeats_left > 1:
+		_day_action_repeats_left -= 1
+		_play_animation(_day_action_key, true)
+	else:
+		_day_action_key = "idle"
+		_day_action_repeats_left = 0
+		_play_animation("idle", true)
 
 
 func _pick_day_action() -> String:
@@ -206,6 +244,8 @@ func _enter_state(new_state: int) -> void:
 	_state_time_left = 0.0
 	_turn_ready = false
 	_walk_stuck_time = 0.0
+	_day_action_key = ""
+	_day_action_repeats_left = 0
 	_stop_horizontal_movement()
 
 	match new_state:
@@ -213,13 +253,20 @@ func _enter_state(new_state: int) -> void:
 			_state_time_left = randf_range(min_action_interval, max_action_interval)
 			var action := _pick_day_action()
 			if not action.is_empty():
+				_day_action_key = action
+				if action != "idle":
+					# 一次性动作连续播放 2~3 次，播完再回到 idle
+					_day_action_repeats_left = randi_range(2, 3)
 				_play_animation(action, true)
 
 		State.DAY_WALK:
 			if not _anim_map.has("walk"):
 				_enter_state(State.DAY_ACTION)
 				return
-			_walk_dir = _random_dir()
+			_walk_dir = _pick_safe_direction(_body.global_position, _random_dir())
+			if _walk_dir == Vector3.ZERO:
+				_enter_state(State.DAY_ACTION)
+				return
 			_walk_speed = walk_speed * randf_range(0.7, 1.3)
 			_last_walk_pos = _body.global_position
 			_state_time_left = randf_range(min_walk_duration, max_walk_duration)
@@ -254,6 +301,11 @@ func _enter_state(new_state: int) -> void:
 			if _anim_map.has("idle"):
 				_play_animation("idle", true)
 
+		State.NIGHT_BLOCKED:
+			# 追到地形边界但下一步会出岛：原地等待，不再持续播放 run
+			if _anim_map.has("idle"):
+				_play_animation("idle", true)
+
 
 func _update_state(delta: float) -> void:
 	_state_elapsed += delta
@@ -275,6 +327,8 @@ func _update_state(delta: float) -> void:
 			_update_night_jump(delta)
 		State.NIGHT_PAUSE:
 			_update_night_pause(delta)
+		State.NIGHT_BLOCKED:
+			_update_night_blocked(delta)
 
 
 func _update_aggro() -> void:
@@ -291,11 +345,16 @@ func _update_aggro() -> void:
 	if _aggroed:
 		if _state == State.DAY_ACTION or _state == State.DAY_WALK:
 			_enter_state(State.NIGHT_CHASE)
-	elif _state == State.NIGHT_CHASE:
+	elif _state == State.NIGHT_CHASE or _state == State.NIGHT_BLOCKED:
 		_enter_state(State.DAY_ACTION)
 
 
 func _update_day_action(delta: float) -> void:
+	# 一次性随机动作还在重复播放时先不走计时，保证完整播放 2~3 次；
+	# 播放完切回 idle 后，idle 再持续播放一段时间
+	if not _day_action_key.is_empty() and _day_action_key != "idle":
+		return
+
 	_state_time_left -= delta
 	if _state_time_left > 0.0:
 		return
@@ -317,6 +376,22 @@ func _update_day_walk(delta: float) -> void:
 		else:
 			return
 
+	# 统一边界判定：动物被击退出真实地形时不再接管水平移动，让岩浆逻辑处理
+	if not _position_is_on_terrain(_body.global_position):
+		_stop_horizontal_movement()
+		return
+
+	# 下一步不安全时，主动挑一个能走开的方向，而不是停在边界
+	if not _is_direction_safe(_body.global_position, _walk_dir):
+		var safe_dir := _pick_safe_direction(_body.global_position, _walk_dir)
+		if safe_dir == Vector3.ZERO:
+			_enter_state(State.DAY_ACTION)
+			return
+		_walk_dir = safe_dir
+		_turn_ready = false
+		_walk_stuck_time = 0.0
+		return
+
 	_face_direction(_walk_dir, delta)
 	_move_body_horizontal(_walk_dir, _walk_speed)
 
@@ -330,7 +405,11 @@ func _update_day_walk(delta: float) -> void:
 		if moved < _walk_speed * delta * 0.25:
 			_walk_stuck_time += delta
 			if _walk_stuck_time > 0.6:
-				_walk_dir = _random_dir()
+				var safe_dir := _pick_safe_direction(_body.global_position, _random_dir())
+				if safe_dir == Vector3.ZERO:
+					_enter_state(State.DAY_ACTION)
+					return
+				_walk_dir = safe_dir
 				_walk_stuck_time = 0.0
 				_turn_ready = false  # 换方向后先原地转好，避免边旋转边走路
 		else:
@@ -366,6 +445,14 @@ func _update_night_chase(delta: float) -> void:
 
 	if dist > 0.001:
 		var dir := to_player / dist
+		# 统一边界判定：已被击退出真实地形时停止 run，让动物掉落消失
+		if not _position_is_on_terrain(_body.global_position):
+			_stop_horizontal_movement()
+			return
+		if not _is_direction_safe(_body.global_position, dir):
+			# 追到边界外会掉岩浆：切到边界等待/绕行状态，避免一直播放 run 原地踏步
+			_enter_state(State.NIGHT_BLOCKED)
+			return
 		_face_direction(dir, delta)
 		_move_body_horizontal(dir, night_run_speed)
 
@@ -403,6 +490,44 @@ func _update_night_pause(_delta: float) -> void:
 	else:
 		_aggroed = false
 		_enter_state(State.DAY_ACTION)
+
+
+func _update_night_blocked(delta: float) -> void:
+	var player := _get_living_player()
+	if not player:
+		_aggroed = false
+		_enter_state(State.DAY_ACTION)
+		return
+
+	var pos := _body.global_position
+	if not _position_is_on_terrain(pos):
+		# 已被击退出真实地形：交给统一的岩浆消失逻辑，不再移动
+		_stop_horizontal_movement()
+		return
+
+	var to_player := player.global_position - pos
+	to_player.y = 0.0
+	var dist := to_player.length()
+
+	if dist <= NIGHT_JUMP_RANGE and _jump_cooldown_left <= 0.0:
+		_enter_state(State.NIGHT_JUMP)
+		return
+
+	if dist > 0.001:
+		var dir := to_player / dist
+		if dist > NIGHT_JUMP_RANGE and _is_direction_safe(pos, dir):
+			_enter_state(State.NIGHT_CHASE)
+			return
+
+		# 直追不安全：尝试沿边界绕行/向岛内退一步，避免永远卡在边界
+		var detour := _pick_safe_direction(pos, dir)
+		if detour != Vector3.ZERO:
+			_face_direction(detour, delta)
+			_move_body_horizontal(detour, night_run_speed * 0.7)
+			if _anim_map.has("walk"):
+				_play_animation("walk")
+		else:
+			_face_direction(dir, delta)
 
 
 func _finish_jump_attack() -> void:
@@ -525,23 +650,156 @@ func _check_landing_attack() -> void:
 
 # ── 边界安全 ──
 
+func _terrain_radius_at(x: float, z: float) -> float:
+	if terrain_boundary.is_empty():
+		return world_boundary + 1.0
+	var samples := float(terrain_boundary.size())
+	var angle := atan2(z, x)
+	var f := angle / TAU * samples
+	if f < 0.0:
+		f += samples
+	var i0 := int(floor(f)) % terrain_boundary.size()
+	var i1 := (i0 + 1) % terrain_boundary.size()
+	var t: float = f - floor(f)
+	return lerpf(terrain_boundary[i0], terrain_boundary[i1], t)
+
+
+func _is_inside_terrain(pos: Vector3, margin: float = 0.0) -> bool:
+	if terrain_boundary.is_empty():
+		return abs(pos.x) <= world_boundary - margin and abs(pos.z) <= world_boundary - margin
+	var dx := pos.x - terrain_center.x
+	var dz := pos.z - terrain_center.y
+	var r := sqrt(dx * dx + dz * dz)
+	return r <= _terrain_radius_at(dx, dz) - margin
+
+
+## 自主移动的目标位置是否安全（靠近边界时用真实地形射线确认）
+func _next_step_is_safe(next_pos: Vector3) -> bool:
+	if not _is_inside_terrain(next_pos, 0.0):
+		return false
+	var dx := next_pos.x - terrain_center.x
+	var dz := next_pos.z - terrain_center.y
+	var r := sqrt(dx * dx + dz * dz)
+	if r <= _terrain_radius_at(dx, dz) - 2.0:
+		return true
+	return not is_nan(_terrain_height_at(next_pos.x, next_pos.z))
+
+
+## 当前 XZ 位置是否真的站在地形上（所有状态共用的统一判定）
+func _position_is_on_terrain(pos: Vector3) -> bool:
+	if terrain_boundary.is_empty():
+		return abs(pos.x) <= world_boundary and abs(pos.z) <= world_boundary
+	var dx := pos.x - terrain_center.x
+	var dz := pos.z - terrain_center.y
+	var r := sqrt(dx * dx + dz * dz)
+	if r <= _terrain_radius_at(dx, dz) - 2.0:
+		return true
+	return not is_nan(_terrain_height_at(pos.x, pos.z))
+
+
+## 预判一个移动方向是否安全（统一前瞻距离）
+func _is_direction_safe(pos: Vector3, dir: Vector3) -> bool:
+	if dir.length_squared() < 0.001:
+		return false
+	return _next_step_is_safe(pos + dir * BOUNDARY_LOOKAHEAD)
+
+
+## 在边界附近挑选一个可以继续走的方向；优先 preferred，其次朝岛内、沿边界、随机
+func _pick_safe_direction(pos: Vector3, preferred: Vector3) -> Vector3:
+	if preferred.length_squared() > 0.001 and _is_direction_safe(pos, preferred):
+		return preferred.normalized()
+
+	var inward := Vector2(terrain_center.x - pos.x, terrain_center.y - pos.z)
+	var candidates: Array[Vector3] = []
+	if inward.length_squared() > 0.01:
+		candidates.append(Vector3(inward.x, 0.0, inward.y).normalized())
+	if preferred.length_squared() > 0.001:
+		var base := preferred.normalized()
+		candidates.append(base.rotated(Vector3.UP, PI * 0.35))
+		candidates.append(base.rotated(Vector3.UP, -PI * 0.35))
+	for i in range(8):
+		var angle := randf_range(0.0, TAU)
+		candidates.append(Vector3(cos(angle), 0.0, sin(angle)))
+	for dir in candidates:
+		if _is_direction_safe(pos, dir):
+			return dir.normalized()
+	return Vector3.ZERO
+
+
+## 地形射线：返回 XZ 处地形表面 Y；无地形返回 NAN
+func _terrain_height_at(x: float, z: float) -> float:
+	var space := _body.get_world_3d().direct_space_state
+	var query := PhysicsRayQueryParameters3D.create(
+		Vector3(x, 100.0, z),
+		Vector3(x, -50.0, z)
+	)
+	query.collision_mask = TERRAIN_QUERY_LAYER
+	var result := space.intersect_ray(query)
+	if result.is_empty():
+		return NAN
+	return result.position.y
+
+
+## 开始岩浆挣扎：随机播放 run 或 gesture-negative，以固定速度缓慢下沉，倒计时结束后消失
+func _start_lava_struggle() -> void:
+	_dying_in_lava = true
+	_lava_struggle_left = LAVA_STRUGGLE_TIME
+	_stop_horizontal_movement()
+
+	# 与玩家掉入岩浆一致：关闭重力，按固定速度慢慢下沉
+	_body.gravity_scale = 0.0
+	var vel := _body.linear_velocity
+	vel.y = -lava_sink_speed
+	_body.linear_velocity = vel
+
+	var has_run := _anim_map.has("run")
+	var has_gesture := _anim_map.has("gesture-negative")
+	if has_run and has_gesture:
+		_lava_struggle_anim = "run" if randf() < 0.5 else "gesture-negative"
+	elif has_run:
+		_lava_struggle_anim = "run"
+	elif has_gesture:
+		_lava_struggle_anim = "gesture-negative"
+	else:
+		_lava_struggle_anim = "idle" if _anim_map.has("idle") else ""
+	_play_animation(_lava_struggle_anim, true)
+
+
 func _clamp_to_world() -> void:
 	var pos := _body.global_position
-	var clamped := false
 
-	if abs(pos.x) > world_boundary:
-		pos.x = clampf(pos.x, -world_boundary, world_boundary)
-		clamped = true
-	if abs(pos.z) > world_boundary:
-		pos.z = clampf(pos.z, -world_boundary, world_boundary)
-		clamped = true
-	if pos.y < -10.0:
-		pos.y = 2.0
-		_body.linear_velocity = Vector3.ZERO
-		clamped = true
+	# 有地形边界时不再用方形边界拉回动物：动物可以被玩家击退到岛外并掉进岩浆
+	if terrain_boundary.is_empty():
+		var clamped := false
+		if abs(pos.x) > world_boundary:
+			pos.x = clampf(pos.x, -world_boundary, world_boundary)
+			clamped = true
+		if abs(pos.z) > world_boundary:
+			pos.z = clampf(pos.z, -world_boundary, world_boundary)
+			clamped = true
+		if clamped:
+			_body.global_position = pos
 
-	if clamped:
-		_body.global_position = pos
+	# 掉进岩浆：下方没有真实地形，进入 1 秒挣扎动画，之后消失
+	if pos.y < LAVA_ENTER_Y:
+		var ground_y := _terrain_height_at(pos.x, pos.z)
+		if is_nan(ground_y):
+			_start_lava_struggle()
+			return
+
+	# 兜底：如果没触发挣扎但已掉到很深且无地形，直接消失
+	if pos.y < LAVA_DISAPPEAR_Y:
+		var ground_y := _terrain_height_at(pos.x, pos.z)
+		if is_nan(ground_y):
+			_body.queue_free()
+			return
+
+	# 有真实地形但动物卡到地形下方很深的位置时，抬回地面（防止模型不可见）
+	if pos.y < -3.0:
+		var ground_y := _terrain_height_at(pos.x, pos.z)
+		if not is_nan(ground_y) and pos.y < ground_y - 3.0:
+			_body.global_position = Vector3(pos.x, ground_y + 0.5, pos.z)
+			_body.linear_velocity = Vector3.ZERO
 
 
 # ── 速度限制 ──

@@ -2,14 +2,14 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://qa57nvnjmdxl"
+uid="uid://bcixx0ju0uguc"
 path.s3tc="res://.godot/imported/地形_T_AO_当前-T_粗糙度_当前.png-6f366dcb567a5e9a1d44b61c14925933.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
 }
 generator_parameters={
-"md5": "96e6071aa6727e59925edafae2c3a052"
+"md5": "13f3e46a8f71689cae1f48fb7c6b62bb"
 }
 
 [deps]

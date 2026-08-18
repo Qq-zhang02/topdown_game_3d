@@ -2,14 +2,14 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bp7ke8r5tpdba"
+uid="uid://dqjxv764kf38c"
 path.s3tc="res://.godot/imported/地形_T_法线_当前.png-50fa5e741631b4927319fbf70c066d9d.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
 }
 generator_parameters={
-"md5": "2d993512ba57de69aa05a4ac402ce2e6"
+"md5": "1682da7a1cb7c1d22042c9b64cc9b617"
 }
 
 [deps]

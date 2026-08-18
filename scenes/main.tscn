@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://c3dmain0001"]
 
 [ext_resource type="Script" uid="uid://bovy7fk3olqr5" path="res://scripts/world_3d.gd" id="1_world"]
-[ext_resource type="PackedScene" uid="uid://cstgtufoxmgs4" path="res://models/landscape/地形.glb" id="2_terrain"]
+[ext_resource type="PackedScene" uid="uid://dmgso5uths0b5" path="res://models/landscape/地形.glb" id="2_terrain"]
 
 [sub_resource type="Environment" id="Environment_world"]
 background_mode = 1

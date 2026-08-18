@@ -4,6 +4,8 @@ extends Node3D
 const WORLD_HALF: float = 50.0
 const OBSTACLE_COUNT: int = 100
 const MINIMAP_SIZE := Vector2(220, 220)
+const TERRAIN_QUERY_LAYER: int = 1 << 3  # 地形专用射线层（第 4 层），避免障碍物/建筑干扰高度查询
+const TERRAIN_BOUNDARY_SAMPLES: int = 64  # 地形边界径向采样数
 
 var _obstacle_positions: Array[Vector3] = []
 var _obstacle_data: Array[Dictionary] = []
@@ -26,6 +28,7 @@ var _resource_positions: Array[Dictionary] = []  # 资源节点位置存档 [{ki
 var _regen_timer: float = 0.0                    # 资源重生计时器
 var _animal_regen_timer: float = 0.0              # 动物重生计时器
 var _terrain_max_y: float = 0.0                   # 地形最高点 Y（用于初始站位估算）
+var _terrain_boundary: Array[float] = []          # 地形边界：各方向到边界的半径（以原点为中心）
 
 
 func _ready() -> void:
@@ -137,7 +140,7 @@ func _create_ground() -> void:
 		add_child(ground)
 		var body := StaticBody3D.new()
 		body.name = "GroundBody"
-		body.collision_layer = 1
+		body.collision_layer = 1 | TERRAIN_QUERY_LAYER
 		var col := CollisionShape3D.new()
 		var shape := BoxShape3D.new()
 		shape.size = Vector3(total_size, 0.05, total_size)
@@ -155,8 +158,8 @@ func _create_ground() -> void:
 	if not body_node:
 		body_node = StaticBody3D.new()
 		body_node.name = "TerrainBody"
-		body_node.collision_layer = 1
 		terrain.add_child(body_node)
+	body_node.collision_layer = 1 | TERRAIN_QUERY_LAYER
 
 	# 清掉旧碰撞子节点（重复调用时）
 	for old in body_node.get_children():
@@ -179,6 +182,7 @@ func _create_ground() -> void:
 			mesh_count += 1
 
 	print("[World3D] 地形碰撞构建完成: %d 个碰撞体" % mesh_count)
+	_build_terrain_boundary(terrain)
 
 
 ## 自动适配地形：居中并缩放到世界范围（回退保险，编辑器已摆好时幂等）
@@ -213,17 +217,128 @@ func get_terrain_height_at(x: float, z: float) -> float:
 	return _get_terrain_height(x, z)
 
 
-## 射线检测地表高度（从上方 100m 向下射）
+## 射线检测地表高度（从上方 100m 向下射，只查地形层）
 func _get_terrain_height(x: float, z: float) -> float:
 	var space := get_world_3d().direct_space_state
 	var from := Vector3(x, 100.0, z)
 	var to := Vector3(x, -100.0, z)
 	var query := PhysicsRayQueryParameters3D.create(from, to)
-	query.collision_mask = 1  # 地面/障碍物层
+	query.collision_mask = TERRAIN_QUERY_LAYER  # 只与地形碰撞
 	var result := space.intersect_ray(query)
 	if not result.is_empty():
 		return result.position.y
 	return 0.0
+
+
+# ═══════════════════════════════════════════
+# 地形边界（运行时从地形网格顶点提取径向边界）
+# ═══════════════════════════════════════════
+
+## 按 64 个方向采样地形网格最外侧顶点，得到以原点为中心的径向边界。
+## 新地形是类圆形区域，之后所有随机生成/建造判定都用这个边界，不再用方形世界范围。
+func _build_terrain_boundary(terrain: Node3D) -> void:
+	_terrain_boundary.clear()
+	_terrain_boundary.resize(TERRAIN_BOUNDARY_SAMPLES)
+	_terrain_boundary.fill(0.0)
+
+	var found_vertex := false
+	for mi in terrain.find_children("*", "MeshInstance3D", true, false):
+		var m: MeshInstance3D = mi
+		var mesh: Mesh = m.mesh
+		if not mesh:
+			continue
+		var faces := mesh.get_faces()
+		if faces.is_empty():
+			continue
+		var xform := m.global_transform
+		for v in faces:
+			var p := xform * v
+			var r := sqrt(p.x * p.x + p.z * p.z)
+			if r <= 0.001:
+				continue
+			var angle := atan2(p.z, p.x)
+			var f := angle / TAU * float(TERRAIN_BOUNDARY_SAMPLES)
+			var sector := posmod(int(floor(f)), TERRAIN_BOUNDARY_SAMPLES)
+			if r > _terrain_boundary[sector]:
+				_terrain_boundary[sector] = r
+			found_vertex = true
+
+	if not found_vertex:
+		_terrain_boundary.clear()
+		return
+
+	# 只向外平滑，避免边界采样在局部凹陷处把有效地形误判为地图外
+	var smoothed := _terrain_boundary.duplicate()
+	var n := _terrain_boundary.size()
+	for i in range(n):
+		var prev := _terrain_boundary[(i - 1 + n) % n]
+		var next := _terrain_boundary[(i + 1) % n]
+		smoothed[i] = maxf(_terrain_boundary[i], (prev + next) * 0.5)
+	_terrain_boundary = smoothed
+
+	var min_r := _terrain_boundary[0]
+	var max_r := _terrain_boundary[0]
+	for r in _terrain_boundary:
+		min_r = minf(min_r, r)
+		max_r = maxf(max_r, r)
+	print("[World3D] 地形边界构建完成: 采样=%d, 半径 %.1f~%.1f" % [_terrain_boundary.size(), min_r, max_r])
+
+
+## 方向 (x,z) 处的地形边界半径（相邻采样角度线性插值）
+func _terrain_radius_at(x: float, z: float) -> float:
+	if _terrain_boundary.is_empty():
+		return WORLD_HALF
+	var samples := float(_terrain_boundary.size())
+	var angle := atan2(z, x)
+	var f := angle / TAU * samples
+	if f < 0.0:
+		f += samples
+	var i0 := int(floor(f)) % _terrain_boundary.size()
+	var i1 := (i0 + 1) % _terrain_boundary.size()
+	var t: float = f - floor(f)
+	return lerpf(_terrain_boundary[i0], _terrain_boundary[i1], t)
+
+
+## 某个 XZ 点是否在地形边界内（margin 为向内收缩的安全距离）
+func is_inside_terrain(x: float, z: float, margin: float = 0.0) -> bool:
+	if _terrain_boundary.is_empty():
+		return abs(x) <= WORLD_HALF - margin and abs(z) <= WORLD_HALF - margin
+	var r := sqrt(x * x + z * z)
+	return r <= _terrain_radius_at(x, z) - margin
+
+
+## 一个 XZ 矩形区域（中心 + 半尺寸）是否完整位于地形边界内
+func is_area_inside_terrain(center: Vector3, half: Vector2, margin: float = 0.5) -> bool:
+	if _terrain_boundary.is_empty():
+		return abs(center.x) + half.x <= WORLD_HALF - margin and abs(center.z) + half.y <= WORLD_HALF - margin
+	var points := [
+		Vector2(0.0, 0.0),
+		Vector2(-half.x, -half.y),
+		Vector2(half.x, -half.y),
+		Vector2(-half.x, half.y),
+		Vector2(half.x, half.y),
+		Vector2(0.0, -half.y),
+		Vector2(0.0, half.y),
+		Vector2(-half.x, 0.0),
+		Vector2(half.x, 0.0),
+	]
+	for offset in points:
+		if not is_inside_terrain(center.x + offset.x, center.z + offset.y, margin):
+			return false
+	return true
+
+
+## 在边界内随机采样一个 XZ 点（方形回退保底）
+func _random_terrain_xz(rng: RandomNumberGenerator, margin: float) -> Vector2:
+	if _terrain_boundary.is_empty():
+		return Vector2(
+			rng.randf_range(-WORLD_HALF + margin, WORLD_HALF - margin),
+			rng.randf_range(-WORLD_HALF + margin, WORLD_HALF - margin)
+		)
+	var angle := rng.randf_range(0.0, TAU)
+	var max_r := maxf(_terrain_radius_at(cos(angle), sin(angle)) - margin, 0.5)
+	var r := rng.randf_range(0.0, max_r)
+	return Vector2(r * cos(angle), r * sin(angle))
 
 
 func _make_terrain_texture() -> Texture2D:
@@ -273,7 +388,7 @@ func _create_lava() -> void:
 	_lava.set_script(LavaScript)
 	_lava.name = "Lava"
 	add_child(_lava)
-	_lava.build(WORLD_HALF)
+	_lava.build(WORLD_HALF, _terrain_boundary)
 
 
 # ═══════════════════════════════════════════
@@ -295,9 +410,18 @@ func _create_obstacles() -> void:
 		var d: float = rng.randf_range(1.0, 4.0)
 		var h: float = rng.randf_range(1.5, 5.0)
 
-		var pos_x := rng.randf_range(margin, WORLD_HALF * 2 - margin) - WORLD_HALF
-		var pos_z := rng.randf_range(margin, WORLD_HALF * 2 - margin) - WORLD_HALF
-		var pos := Vector3(pos_x, _get_terrain_height(pos_x, pos_z) + h / 2.0, pos_z)
+		var pos := Vector3.ZERO
+		var found := false
+		for attempt in range(80):
+			var xz := _random_terrain_xz(rng, margin)
+			# 障碍物整个底面都必须在地形边界内
+			if not is_area_inside_terrain(Vector3(xz.x, 0.0, xz.y), Vector2(w, d) * 0.5, 1.0):
+				continue
+			pos = Vector3(xz.x, _get_terrain_height(xz.x, xz.y) + h / 2.0, xz.y)
+			found = true
+			break
+		if not found:
+			continue
 
 		var mat_idx: int = 0
 		var roll: float = rng.randf()
@@ -377,9 +501,10 @@ func _create_resource_nodes() -> void:
 			var pos := Vector3.ZERO
 			var found := false
 			for attempt in range(60):
-				var rx := rng.randf_range(-WORLD_HALF + 4.0, WORLD_HALF - 4.0)
-				var rz := rng.randf_range(-WORLD_HALF + 4.0, WORLD_HALF - 4.0)
-				pos = Vector3(rx, _get_terrain_height(rx, rz), rz)
+				var xz := _random_terrain_xz(rng, 4.0)
+				pos = Vector3(xz.x, _get_terrain_height(xz.x, xz.y), xz.y)
+				if not is_area_inside_terrain(pos, Vector2(1.0, 1.0), 0.5):
+					continue
 				if is_area_free(pos, Vector2(1.0, 1.0)) and pos.distance_to(_player.global_position) > 6.0:
 					found = true
 					break
@@ -398,6 +523,8 @@ func _spawn_resources_from_save() -> void:
 		var sx := r.get("pos_x", 0.0) as float
 		var sz := r.get("pos_z", 0.0) as float
 		var pos := Vector3(sx, _get_terrain_height(sx, sz), sz)
+		if not is_area_inside_terrain(pos, Vector2(1.0, 1.0), 0.5):
+			continue
 		if is_area_free(pos, Vector2(1.0, 1.0)):
 			var node = ResNodeScript.spawn(self, kind, pos)
 			register_occupied(node.occupied_aabb)
@@ -422,9 +549,10 @@ func _try_regen_resource() -> void:
 	var ResNodeScript := load("res://scripts/world/resource_node.gd")
 
 	for attempt in range(30):
-		var rx := rng.randf_range(-WORLD_HALF + 4.0, WORLD_HALF - 4.0)
-		var rz := rng.randf_range(-WORLD_HALF + 4.0, WORLD_HALF - 4.0)
-		var pos := Vector3(rx, _get_terrain_height(rx, rz), rz)
+		var xz := _random_terrain_xz(rng, 4.0)
+		var pos := Vector3(xz.x, _get_terrain_height(xz.x, xz.y), xz.y)
+		if not is_area_inside_terrain(pos, Vector2(1.0, 1.0), 0.5):
+			continue
 		if not _player or pos.distance_to(_player.global_position) < 8.0:
 			continue
 		if is_area_free(pos, Vector2(1.0, 1.0)):
@@ -473,9 +601,10 @@ func _spawn_single_animal() -> void:
 	var pos: Vector3
 	var found := false
 	for attempt in range(30):
-		var ax := rng.randf_range(-WORLD_HALF + 4.0, WORLD_HALF - 4.0)
-		var az := rng.randf_range(-WORLD_HALF + 4.0, WORLD_HALF - 4.0)
-		pos = Vector3(ax, 50.0, az)
+		var xz := _random_terrain_xz(rng, 4.0)
+		pos = Vector3(xz.x, 50.0, xz.y)
+		if not is_area_inside_terrain(pos, Vector2(0.4, 0.4), 0.5):
+			continue
 		if _player and pos.distance_to(_player.global_position) < 10.0:
 			continue
 		if is_area_free(pos, Vector2(1.0, 1.0)):
@@ -534,6 +663,7 @@ func _spawn_single_animal() -> void:
 	behavior.set("max_action_interval", randf_range(3.0, 5.0))
 	behavior.set("night_run_speed", randf_range(4.5, 5.8))
 	behavior.set("world_boundary", WORLD_HALF - 1.0)
+	behavior.set("terrain_boundary", _terrain_boundary)
 	body.add_child(behavior)
 
 	body.add_to_group("damageable")
@@ -569,9 +699,8 @@ func unregister_occupied(aabb: AABB) -> void:
 
 ## 检查 center 周围 half(XZ半尺寸) 的区域是否可以放置建筑
 func is_area_free(center: Vector3, half: Vector2) -> bool:
-	if abs(center.x) + half.x > WORLD_HALF - 1.0:
-		return false
-	if abs(center.z) + half.y > WORLD_HALF - 1.0:
+	# 边界与地形轮廓一致：整个占地必须在地形内（方形世界回退由 is_area_inside_terrain 处理）
+	if not is_area_inside_terrain(center, half, 1.0):
 		return false
 	var box := AABB(
 		Vector3(center.x - half.x, 0.0, center.z - half.y),
@@ -727,7 +856,7 @@ func _create_animals() -> void:
 	var spawner := Node.new()
 	spawner.set_script(AnimalSpawnerScript)
 	spawner.name = "AnimalSpawner"
-	spawner.setup(WORLD_HALF, _obstacle_data, _player.position)
+	spawner.setup(WORLD_HALF, _obstacle_data, _player.position, _terrain_boundary)
 	add_child(spawner)
 	spawner.spawn_all()
 

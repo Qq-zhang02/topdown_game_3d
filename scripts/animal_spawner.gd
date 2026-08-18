@@ -23,12 +23,73 @@ const ANIMALS := [
 var _obstacle_data: Array[Dictionary] = []
 var _world_half: float = 50.0
 var _player_pos: Vector3 = Vector3.ZERO
+var _terrain_boundary: Array[float] = []  # 地形径向边界（世界管理器传入，空则回退方形）
+var _terrain_center: Vector2 = Vector2.ZERO
 
 
-func setup(world_half: float, obstacle_data: Array[Dictionary], player_pos: Vector3) -> void:
+func setup(world_half: float, obstacle_data: Array[Dictionary], player_pos: Vector3, terrain_boundary: Array[float] = []) -> void:
 	_world_half = world_half
 	_obstacle_data = obstacle_data
 	_player_pos = player_pos
+	_terrain_boundary = terrain_boundary
+
+
+# ═══════════════════════════════════════════
+# 地形边界（与 world_3d.gd 中同一套径向边界约定）
+# ═══════════════════════════════════════════
+
+func _terrain_radius_at(x: float, z: float) -> float:
+	if _terrain_boundary.is_empty():
+		return _world_half
+	var samples := float(_terrain_boundary.size())
+	var angle := atan2(z, x)
+	var f := angle / TAU * samples
+	if f < 0.0:
+		f += samples
+	var i0 := int(floor(f)) % _terrain_boundary.size()
+	var i1 := (i0 + 1) % _terrain_boundary.size()
+	var t: float = f - floor(f)
+	return lerpf(_terrain_boundary[i0], _terrain_boundary[i1], t)
+
+
+func _is_inside_terrain(pos: Vector3, margin: float = 0.0) -> bool:
+	if _terrain_boundary.is_empty():
+		return abs(pos.x) <= _world_half - margin and abs(pos.z) <= _world_half - margin
+	var r := sqrt(pos.x * pos.x + pos.z * pos.z)
+	return r <= _terrain_radius_at(pos.x, pos.z) - margin
+
+
+func _is_area_inside_terrain(pos: Vector3, half: Vector2, margin: float = 0.5) -> bool:
+	if _terrain_boundary.is_empty():
+		return abs(pos.x) + half.x <= _world_half - margin and abs(pos.z) + half.y <= _world_half - margin
+	var points := [
+		Vector2(0.0, 0.0),
+		Vector2(-half.x, -half.y),
+		Vector2(half.x, -half.y),
+		Vector2(-half.x, half.y),
+		Vector2(half.x, half.y),
+		Vector2(0.0, -half.y),
+		Vector2(0.0, half.y),
+		Vector2(-half.x, 0.0),
+		Vector2(half.x, 0.0),
+	]
+	for offset in points:
+		if not _is_inside_terrain(Vector3(pos.x + offset.x, pos.y, pos.z + offset.y), margin):
+			return false
+	return true
+
+
+func _random_inside_terrain(rng: RandomNumberGenerator, margin: float) -> Vector3:
+	if _terrain_boundary.is_empty():
+		return Vector3(
+			rng.randf_range(-_world_half + margin, _world_half - margin),
+			50.0,
+			rng.randf_range(-_world_half + margin, _world_half - margin)
+		)
+	var angle := rng.randf_range(0.0, TAU)
+	var max_r := maxf(_terrain_radius_at(cos(angle), sin(angle)) - margin, 0.5)
+	var r := rng.randf_range(0.0, max_r)
+	return Vector3(r * cos(angle), 50.0, r * sin(angle))
 
 
 func spawn_all() -> void:
@@ -41,11 +102,10 @@ func spawn_all() -> void:
 		var found := false
 
 		while attempts < 50 and not found:
-			pos = Vector3(
-				rng.randf_range(-_world_half + spawn_margin, _world_half - spawn_margin),
-				50.0,
-				rng.randf_range(-_world_half + spawn_margin, _world_half - spawn_margin)
-			)
+			pos = _random_inside_terrain(rng, spawn_margin)
+			if not _is_area_inside_terrain(pos, Vector2(0.4, 0.4), 0.5):
+				attempts += 1
+				continue
 			if _is_position_clear(pos) and pos.distance_to(_player_pos) > 5.0:
 				found = true
 			attempts += 1
@@ -117,6 +177,8 @@ func _spawn_animal(model_name: String, pos: Vector3, scale_val: float, rot_y: fl
 	behavior.set("max_action_interval", randf_range(3.0, 5.0))
 	behavior.set("night_run_speed", randf_range(4.5, 5.8))
 	behavior.set("world_boundary", _world_half - 1.0)  # 边界安全距离
+	behavior.set("terrain_boundary", _terrain_boundary)
+	behavior.set("terrain_center", _terrain_center)
 	body.add_child(behavior)
 
 	# 血量 + 可被近战攻击 + 死亡掉落
