@@ -139,7 +139,8 @@ func _on_body_entered(body: Node3D) -> void:
 	# 开始飞向玩家
 	_flying_to = body
 	if _area:
-		_area.monitoring = false
+		# 不能在 body_entered 信号回调里直接改 monitoring，需延后到帧末
+		_area.set_deferred("monitoring", false)
 
 
 func _do_pickup(body: Node3D) -> void:

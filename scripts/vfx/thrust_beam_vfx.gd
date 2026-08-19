@@ -36,6 +36,8 @@ func _ready() -> void:
 
 	_beam.name = "BeamMesh"
 	_beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# 从实例化的 GLB 场景里剥离出的节点，先清空 owner，避免“owner 不一致”警告
+	_beam.owner = null
 	add_child(_beam)
 
 	var base_mat := _beam.get_active_material(0)
