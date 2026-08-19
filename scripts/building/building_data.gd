@@ -50,3 +50,5 @@ static func _compute_aabb_size(node: Node3D) -> Vector3:
 @export var hazard_interval: float = 1.0      # 扣血间隔（秒）
 @export var hazard_knockback: float = 0.0     # 击退冲量（0 = 不击退）
 @export var hazard_knockback_up: float = 0.0  # 击退竖直分量
+@export var hazard_animal_damage_multiplier: float = 1.0     # 小动物扣血倍率（相对玩家，如 3 = 动物受 3 倍伤害）
+@export var hazard_animal_knockback_multiplier: float = 1.0  # 小动物击退倍率（相对玩家，如 1.5 = 动物被弹得更远）

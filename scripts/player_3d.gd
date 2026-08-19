@@ -15,6 +15,7 @@ var _skin_path: String = DEFAULT_SKIN
 @export var gravity: float = 35.0
 @export var rotation_lag: float = 0.0  # 转向迟滞，越高转向越笨重，最高加到0.95
 @export var vision_range: float = 6.0  # 视力属性，瞄准时摄像机最大偏移距离
+@export var aim_hold_delay: float = 0.08  # 按住右键超过该时长才进入瞄准（秒），防单单击误触发摄像头晃动
 
 var _equipment_mgr: Node
 var _model_root: Node3D
@@ -33,6 +34,7 @@ var _stepped_up_last_frame: bool = false
 var _collision_shape: CollisionShape3D
 var _step_fail_pos: Vector3 = Vector3.INF
 var _step_fail_cd: float = 0.0
+var _aim_held_time: float = -1.0          # 右键已按住时长（秒），<0 表示未按住
 
 
 func set_model_path(path: String) -> void:
@@ -413,8 +415,13 @@ func get_mouse_ground_position() -> Vector3:
 	return global_position
 
 
-## 是否处于瞄准状态（按住鼠标右键）
+## 是否处于瞄准状态（按住鼠标右键并超过延迟，防单击误触发摄像头晃动）
 func is_aiming() -> bool:
+	return _aim_held_time >= aim_hold_delay
+
+
+## 原始右键按住状态（不受延迟影响）：摄像机据此在延迟期间保持偏移、不归位
+func is_aim_held() -> bool:
 	return Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
 
 
@@ -436,6 +443,15 @@ func _physics_process(delta: float) -> void:
 
 	if Input.is_action_just_pressed("jump") and is_on_floor() and not _in_water:
 		velocity.y = jump_velocity
+
+	# 瞄准按住时长：按住右键累计，松开即清零（进入瞄准有延迟，单击不触发）
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+		if _aim_held_time < 0.0:
+			_aim_held_time = 0.0
+		else:
+			_aim_held_time += delta
+	else:
+		_aim_held_time = -1.0
 
 	var input_dir := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	var current_speed: float = speed * 0.25 if is_aiming() else speed #瞄准状态下减速

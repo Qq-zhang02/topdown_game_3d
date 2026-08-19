@@ -821,7 +821,9 @@ func _attach_hazard(building: Node3D, size: Vector3, data: Resource) -> void:
 		float(data.get("hazard_damage")),
 		float(data.get("hazard_interval")),
 		float(data.get("hazard_knockback")),
-		float(data.get("hazard_knockback_up"))
+		float(data.get("hazard_knockback_up")),
+		float(data.get("hazard_animal_damage_multiplier")),
+		float(data.get("hazard_animal_knockback_multiplier"))
 	)
 	var col := CollisionShape3D.new()
 	var shape := BoxShape3D.new()

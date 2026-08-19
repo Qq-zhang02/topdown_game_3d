@@ -77,11 +77,12 @@ func _update_moon() -> void:
 	var moon_angle: float = _get_sun_elevation_angle() + 180.0
 	moon_light.rotation_degrees = Vector3(moon_angle, 210, 0)
 
-	var moon_height: float = max(0.0, sin(deg_to_rad(moon_angle + 90.0)))
+	# 月亮向下照射时才发光：θ_moon=-90°（午夜、月亮在头顶）→1，θ_moon=90°（正午、在地下）→0
+	var moon_height: float = max(0.0, -sin(deg_to_rad(moon_angle)))
 
 	# 柔和蓝白月光
 	moon_light.light_color = Color(0.45, 0.55, 0.85)
-	moon_light.light_energy = moon_height * 0.35
+	moon_light.light_energy = moon_height * 0.01
 	moon_light.shadow_enabled = false
 
 

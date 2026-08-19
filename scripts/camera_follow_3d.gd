@@ -26,8 +26,9 @@ const LOOK_SPEED_FACTOR: float = 1.0     # 每 1° 偏差增加的转速（度/s
 # ═══════════════════════════════════════════
 # 瞄准偏移 — 匀速向鼠标方向平移
 # ═══════════════════════════════════════════
-const AIM_SPEED: float = 8.0             # 瞄准偏移速度（m/s，匀速）
+const AIM_SPEED: float = 8.0             # 瞄准偏移最大速度（m/s）
 const AIM_RETURN_SPEED: float = 10.0     # 松开右键后偏移归位速度（m/s）
+const AIM_ACCEL: float = 60.0            # 瞄准偏移加速度（m/s²），进入瞄准时平滑起步、不突跳
 
 # ── 内部状态 ──
 var _follow_pos := Vector3.ZERO
@@ -37,6 +38,7 @@ var _look_yaw: float = 0.0
 var _was_aiming: bool = false
 var _aim_pitch: float = 0.0
 var _aim_yaw: float = 0.0
+var _aim_speed: float = 0.0             # 当前瞄准偏移速度（由 AIM_ACCEL 平滑加速到 AIM_SPEED）
 
 
 func _ready() -> void:
@@ -53,6 +55,8 @@ func _process(delta: float) -> void:
 	var tp: Vector3 = target.global_position
 	var back_offset: Vector3 = Vector3(0, 0, HEIGHT * cos(deg_to_rad(TILT_ANGLE)))
 	var aiming: bool = target.has_method("is_aiming") and target.is_aiming()
+	# 原始按住状态（未过延迟也算按住）：延迟期间保持偏移、不归位
+	var held: bool = target.has_method("is_aim_held") and target.is_aim_held()
 
 	# ── 瞄准偏移 ──
 	if aiming:
@@ -68,18 +72,27 @@ func _process(delta: float) -> void:
 				var r := clampf(dm.length() / (vision * 2.5), 0.0, 1.0)
 				target_aim = dm.normalized() * vision * r
 				target_aim.y = 0.0
-		_aim_offset = _aim_offset.move_toward(target_aim, AIM_SPEED * delta)
+		# 起步带加速度：进入瞄准瞬间平滑加速，不“咣”地一下弹出
+		_aim_speed = minf(_aim_speed + AIM_ACCEL * delta, AIM_SPEED)
+		_aim_offset = _aim_offset.move_toward(target_aim, _aim_speed * delta)
+	elif held:
+		# 已按住右键但未过瞄准延迟：保持当前偏移不动，避免“先归位再向鼠标移动”
+		_aim_speed = 0.0
 	else:
+		_aim_speed = 0.0
 		_aim_offset = _aim_offset.move_toward(Vector3.ZERO, AIM_RETURN_SPEED * delta)
 
-	# ── 位置追踪 —— 瞄准时随 _aim_offset 匀速偏移，否则有偏差才追 ──
+	# ── 位置追踪 —— 瞄准时随 _aim_offset 偏移，否则有偏差才追 ──
 	var raw_pos := Vector3(tp.x + _aim_offset.x, tp.y + HEIGHT, tp.z + _aim_offset.z) + back_offset
 	if _follow_pos == Vector3.ZERO:
 		_follow_pos = raw_pos
 
 	if aiming:
-		# _aim_offset 已匀速移动，位置直贴，不额外加阻尼
-		_follow_pos = raw_pos
+		# 瞄准时：阻尼跟随（不低于偏移速度），避免模式切换瞬间位置跳动
+		var pos_dist := _follow_pos.distance_to(raw_pos)
+		if pos_dist > 0.001:
+			var pos_speed := maxf(POS_MIN_SPEED + pos_dist * POS_SPEED_FACTOR, _aim_speed)
+			_follow_pos = _follow_pos.move_toward(raw_pos, pos_speed * delta)
 	else:
 		var pos_dist := _follow_pos.distance_to(raw_pos)
 		if pos_dist > 0.001:
