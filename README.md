@@ -1,10 +1,19 @@
-# TopDownGame3D v3.6.2
+# TopDownGame3D v3.7.0
 
-> Godot 4.7.1 · 俯视角 3D · 全 GDScript · 2026-08-31
+> Godot 4.7.1 · 俯视角 3D · 全 GDScript · 2026-09-01
 
 ---
 
 ## 0. 更新记录
+
+### v3.7.0
+
+- 篝火交互玩法：建造材料改为 **3 石头 + 2 木材**，放置后**不发光**（无火焰/无光源/危险区关闭）。
+- 靠近篝火（1.8m 内）显示浮动提示 `[E] 添加木柴 ×3`（木材不足时变红色提示），按 **E** 消耗背包木材点燃，燃烧 **6 游戏小时**。
+- 燃烧期间：火光闪烁 + 火焰锥形发光体 + 危险区恢复（触碰扣血/击退，小动物受 1.5 倍伤害）。
+- 熄灭后自动回到未点燃状态，可**再次靠近按 E 添加木柴**循环使用。
+- 篝火燃烧状态（点燃中 + 剩余时长）随存档保存/恢复；远离时提示自动隐藏，近距离才显示。
+- 新增 **E** 交互按键（可重绑定）。
 
 ### v3.6.2
 
@@ -147,6 +156,7 @@ world_3d._ready()
 | **Q** | 切换武器（木剑→关） |
 | **1 / 2 / 3** | 使用对应消耗品栏位物品（8 秒冷却） |
 | **Tab** | 背包（拖拽整理，右键物品 → 装备 / 卸下 / 使用） |
+| **E** | **交互**：靠近未点燃的篝火添加木材点燃（燃烧 6 游戏小时，熄灭后可再添加） |
 | **B** | 建造菜单 → 选配方 → 幽灵预览 → 左键放置 |
 | **R** | 建造时旋转 90° |
 | 右键(按住) | **瞄准**（移速降至1/4 + 摄像机平滑偏移到鼠标指向处）；建造中点右键取消 |
@@ -284,7 +294,27 @@ var current_speed: float = speed * 0.25 if is_aiming() else speed
 - `place_building()` 自动为 `hazard_damage > 0` 的建筑附加 Area3D（覆盖占地范围）
 - 后续地刺等危险物：新建 .tres 配 `hazard_*` 字段即可复用，无需改代码
 
-**篝火当前配置（campfire.tres）：** `hazard_damage=5.0`、`hazard_interval=0.5`、`hazard_knockback=6.0`、`hazard_knockback_up=2.0`
+**篝火当前配置（campfire.tres）：** `hazard_damage=1.0`、`hazard_interval=0.25`、`hazard_knockback=4.0`、`hazard_knockback_up=2.0`、动物伤害倍率 1.5
+
+### 篝火交互（v3.7.0+）
+
+**文件：** `scripts/building/campfire.gd`（`class_name CampfireLogic`，由 `place_building` 在 `fuel_item_id` 非空时自动挂载）
+
+| 属性 | 值 | 说明 |
+|------|-----|------|
+| `emits_light` | true | 光源参数仍以 `.tres` 为准，但**放置后默认关闭**，点燃时才发光 |
+| `fuel_item_id` | wood | 燃料物品 ID |
+| `fuel_per_ignite` | 3 | 每次点燃消耗的木材数 |
+| `burn_duration_hours` | 6.0 | 单次燃烧时长（**游戏小时**，随昼夜 `seconds_per_day` 换算，暂停不计时） |
+| `interaction_range` | 1.8 | 交互半径（米），需靠近才有效 |
+
+**流程：** 放置（3 石 + 2 木）→ 未点燃（无光无火、危险区关闭）→ 靠近显示浮动提示 `[E] 添加木柴 ×3` → 按 **E** 扣 3 木材点燃 → 燃烧 6 游戏小时（火光闪烁）→ 自动熄灭 → 可再次按 E 添加。木材不足时提示变红并显示 `[E] 木材不足 ×3`。
+
+**实现要点：**
+- 发光/危险区由 `CampfireLogic` 按燃烧状态切换：`Light.visible`、`Flame.visible`、`Hazard.monitoring` 同步开关
+- 燃烧计时用 `delta × 24 / seconds_per_day` 换算游戏小时，调整一天时长或暂停都自动正确
+- 多个篝火同时在交互范围内时只有**最近**的一处响应，按一次不会扣多份木材
+- 提示用 `Label3D`（billboard + no_depth_test），上下浮动更显眼；存档写入 `{lit, remaining_hours}`，进档后按剩余时长继续燃烧
 
 ### 地形系统（v3.4.1+）
 

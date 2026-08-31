@@ -16,6 +16,7 @@ var _menu: CanvasLayer
 
 var _current: Resource = null
 var _current_size: Vector3 = Vector3.ONE  # 从预制体 AABB 缓存的尺寸
+var _current_min_y: float = 0.0           # 预制体 AABB 底部偏移（放置时贴地用）
 var _placing: bool = false
 var _rot_index: int = 0  # 0~3，90° 一档
 var _ghost: MeshInstance3D
@@ -73,8 +74,9 @@ func _create_menu() -> void:
 
 func _on_recipe_selected(data: Resource) -> void:
 	_current = data
-	# ★ 尺寸由预制体 mesh AABB 决定（tres 不保存尺寸），选中时缓存一次
+	# ★ 尺寸/AABB底部由预制体 mesh AABB 决定（tres 不保存尺寸），选中时缓存一次
 	_current_size = data.get_size()
+	_current_min_y = data.get_min_y()
 	_rot_index = 0
 	_placing = true
 	_menu.hide()
@@ -118,10 +120,12 @@ func _process(_delta: float) -> void:
 	var target: Vector3 = _player.get_mouse_ground_position()
 	target.x = roundf(target.x / GRID) * GRID
 	target.z = roundf(target.z / GRID) * GRID
-	target.y = _world.get_terrain_height_at(target.x, target.z) + _current_size.y * 0.5
+	# 贴地放置：模型 AABB 底部 = 地表 - min_y 修正（居中建模的建筑与 -尺寸一半等价）
+	target.y = _world.get_terrain_height_at(target.x, target.z) - _current_min_y
 	_ghost_pos = target
 
-	_ghost.position = target
+	# 幽灵盒子中心对齐模型 AABB 中心
+	_ghost.position = target + Vector3(0.0, _current_size.y * 0.5 + _current_min_y, 0.0)
 	_ghost.rotation.y = _rot_index * PI * 0.5
 
 	_ghost_valid = _check_valid(target)

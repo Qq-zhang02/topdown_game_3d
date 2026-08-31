@@ -15,6 +15,7 @@ const ACTIONS := [
 	{"id": "consume_2",        "label": "消耗品栏位 2", "default": KEY_2},
 	{"id": "consume_3",        "label": "消耗品栏位 3", "default": KEY_3},
 	{"id": "jump",        "label": "跳跃",     "default": KEY_SPACE},
+	{"id": "interact",    "label": "交互",     "default": KEY_E},
 	{"id": "inventory_toggle", "label": "背包", "default": KEY_TAB},
 	{"id": "build_menu",  "label": "建造菜单", "default": KEY_B},
 	{"id": "build_rotate", "label": "旋转建筑", "default": KEY_R},

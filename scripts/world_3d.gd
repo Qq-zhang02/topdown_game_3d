@@ -719,8 +719,9 @@ func is_area_free(center: Vector3, half: Vector2) -> bool:
 	return true
 
 
-## 放置建筑（由 BuildController 调用，材料已在控制器中扣除）
-func place_building(data: Resource, pos: Vector3, rot_y: float, from_save: bool = false) -> void:
+## 放置建筑（由 BuildController 调用，材料已在控制器中扣除），返回放置的节点
+func place_building(data: Resource, pos: Vector3, rot_y: float, from_save: bool = false, state: Dictionary = {}) -> Node3D:
+	var building_node: Node3D = null
 	if not from_save:
 		_buildings_data.append({
 			"resource_path": data.resource_path,
@@ -747,6 +748,7 @@ func place_building(data: Resource, pos: Vector3, rot_y: float, from_save: bool 
 					n.collision_layer = 1
 				add_child(n)
 				used_scene = true
+				building_node = n
 				# ★ 光源参数以 .tres 为准：覆盖预制体内的灯光（位置仍在 .tscn 内）
 				if data.get("emits_light"):
 					for light in n.find_children("*", "OmniLight3D", true, false):
@@ -760,7 +762,7 @@ func place_building(data: Resource, pos: Vector3, rot_y: float, from_save: bool 
 				var nsz := BuildingData._compute_aabb_size(n)
 				if nsz != Vector3.ZERO:
 					bsize = nsz
-				# 危险区：触碰扣血 + 击退
+				# 危险区：触碰扣血 + 击退（篝火由交互组件控制：仅燃烧时生效）
 				if data.get("hazard_damage") > 0.0:
 					_attach_hazard(n, bsize, data)
 
@@ -772,6 +774,7 @@ func place_building(data: Resource, pos: Vector3, rot_y: float, from_save: bool 
 		body.position = pos
 		body.rotation.y = rot_y
 		add_child(body)
+		building_node = body
 
 		var mesh := MeshInstance3D.new()
 		var box := BoxMesh.new()
@@ -802,6 +805,16 @@ func place_building(data: Resource, pos: Vector3, rot_y: float, from_save: bool 
 		if data.hazard_damage > 0.0:
 			_attach_hazard(body, bsize, data)
 
+	# 交互式建筑（篝火点火）：初始不发光，靠近按 E 加柴点燃，燃烧完可再加（状态可存档恢复）
+	var fuel_cfg = data.get("fuel_item_id")
+	var fuel_qty := int(data.get("fuel_per_ignite"))
+	if building_node and fuel_cfg != null and str(fuel_cfg) != "" and fuel_qty > 0:
+		_attach_campfire_logic(building_node, data, state)
+
+	# 记录节点引用（存档时取篝火燃烧状态用）
+	if building_node and not from_save and _buildings_data.size() > 0:
+		_buildings_data[-1]["node"] = building_node
+
 	var half := Vector2(bsize.x, bsize.z) * 0.5
 	if int(round(rad_to_deg(rot_y))) % 180 != 0:
 		half = Vector2(bsize.z, bsize.x) * 0.5
@@ -809,6 +822,17 @@ func place_building(data: Resource, pos: Vector3, rot_y: float, from_save: bool 
 		Vector3(pos.x - half.x, 0.0, pos.z - half.y),
 		Vector3(half.x * 2.0, bsize.y, half.y * 2.0)
 	))
+	return building_node
+
+
+## 为可点燃建筑（篝火）挂载交互组件：初始熄灭，发光/危险区由组件按燃烧状态控制
+func _attach_campfire_logic(building: Node3D, data: Resource, state: Dictionary) -> void:
+	var CampfireScript := load("res://scripts/building/campfire.gd")
+	var logic := Node.new()
+	logic.set_script(CampfireScript)
+	logic.name = "CampfireLogic"
+	building.add_child(logic)
+	logic.setup(data, _player, _day_night, state)
 
 
 ## 为建筑附加危险区（触碰扣血 + 击退），Area3D 覆盖建筑占地范围
@@ -1290,11 +1314,18 @@ func _collect_world_data() -> Dictionary:
 	var buildings: Array[Dictionary] = []
 	for b in _buildings_data:
 		var bp: Vector3 = b.position
-		buildings.append({
+		var entry: Dictionary = {
 			"resource_path": b.resource_path,
 			"px": bp.x, "py": bp.y, "pz": bp.z,
 			"rot_y": b.rot_y,
-		})
+		}
+		# 篝火等交互建筑：保存燃烧状态（点燃中 + 剩余游戏小时）
+		var bnode = b.get("node")
+		if bnode and is_instance_valid(bnode):
+			var logic: Node = bnode.get_node_or_null("CampfireLogic")
+			if logic and logic.has_method("get_state"):
+				entry["state"] = logic.get_state()
+		buildings.append(entry)
 
 	var animal_count := 0
 	for body in get_tree().get_nodes_in_group("damageable"):
@@ -1433,12 +1464,13 @@ func _restore_from_save(data: Dictionary) -> void:
 			bd.get("px", 0.0), bd.get("py", 0.0), bd.get("pz", 0.0)
 		)
 		var rot_y: float = bd.get("rot_y", 0.0)
-		place_building(bres, pos, rot_y, true)
+		var bnode := place_building(bres, pos, rot_y, true, bd.get("state", {}))
 		# 同时重建 _buildings_data
 		_buildings_data.append({
 			"resource_path": res_path,
 			"position": pos,
 			"rot_y": rot_y,
+			"node": bnode,
 		})
 		bld_count += 1
 

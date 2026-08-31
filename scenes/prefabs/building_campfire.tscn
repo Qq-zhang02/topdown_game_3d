@@ -17,6 +17,44 @@ roughness = 0.8
 [sub_resource type="BoxMesh" id="BoxMesh_51err"]
 size = Vector3(0.5316162, 0.07318115, 0.11407471)
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_stone"]
+albedo_color = Color(0.42, 0.42, 0.46, 1)
+roughness = 0.95
+
+[sub_resource type="SphereMesh" id="SphereMesh_stone"]
+radius = 0.16
+height = 0.32
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_flame_out"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(1, 0.5, 0.1, 0.85)
+emission_enabled = true
+emission = Color(1, 0.45, 0.12, 1)
+emission_energy_multiplier = 3.0
+blend_mode = 1
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_flame_out"]
+top_radius = 0.0
+bottom_radius = 0.2
+height = 0.7
+radial_segments = 12
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_flame_in"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(1, 0.85, 0.4, 0.9)
+emission_enabled = true
+emission = Color(1, 0.85, 0.4, 1)
+emission_energy_multiplier = 4.0
+blend_mode = 1
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_flame_in"]
+top_radius = 0.0
+bottom_radius = 0.11
+height = 0.45
+radial_segments = 10
+
 [node name="Campfire" type="StaticBody3D" unique_id=1262851473]
 
 [node name="Mesh" type="MeshInstance3D" parent="." unique_id=904579489]
@@ -31,6 +69,7 @@ shape = SubResource("SphereShape3D_l35qi")
 
 [node name="Light" type="OmniLight3D" parent="." unique_id=1477136831]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5167054, 0)
+visible = false
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1345505363]
 transform = Transform3D(0.68388844, -0.6838885, -0.2541523, 0.7071068, 0.70710677, 0, 0.17971282, -0.1797128, 0.9671643, -0.052575506, 0.15919048, -0.01379434)
@@ -46,3 +85,42 @@ mesh = SubResource("BoxMesh_51err")
 transform = Transform3D(-0.43483454, 0.43483472, -0.7885668, 0.7071068, 0.70710677, 5.089032e-08, 0.557601, -0.557601, -0.614949, 0.025912642, 0.1569894, -0.0527125)
 material_override = SubResource("StandardMaterial3D_2dim1")
 mesh = SubResource("BoxMesh_51err")
+
+[node name="Stone1" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.1, 0, 0, 0, 0.8, 0, 0, 0, 1.1, 0.45, 0.09, 0)
+material_override = SubResource("StandardMaterial3D_stone")
+mesh = SubResource("SphereMesh_stone")
+
+[node name="Stone2" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.1, 0, 0, 0, 0.8, 0, 0, 0, 1.1, -0.22, 0.09, 0.39)
+material_override = SubResource("StandardMaterial3D_stone")
+mesh = SubResource("SphereMesh_stone")
+
+[node name="Stone3" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.1, 0, 0, 0, 0.8, 0, 0, 0, 1.1, -0.22, 0.09, -0.39)
+material_override = SubResource("StandardMaterial3D_stone")
+mesh = SubResource("SphereMesh_stone")
+
+[node name="Flame" type="Node3D" parent="."]
+visible = false
+
+[node name="Outer" type="MeshInstance3D" parent="Flame"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.55, 0)
+material_override = SubResource("StandardMaterial3D_flame_out")
+mesh = SubResource("CylinderMesh_flame_out")
+
+[node name="Inner" type="MeshInstance3D" parent="Flame"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.52, 0)
+material_override = SubResource("StandardMaterial3D_flame_in")
+mesh = SubResource("CylinderMesh_flame_in")
+
+[node name="Prompt" type="Label3D" parent="."]
+visible = false
+position = Vector3(0, 1.25, 0)
+billboard = 1
+no_depth_test = true
+font_size = 48
+outline_size = 14
+modulate = Color(1, 0.82, 0.25, 1)
+outline_modulate = Color(0.1, 0.07, 0.03, 0.9)
+text = ""
