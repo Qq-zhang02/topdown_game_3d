@@ -76,13 +76,15 @@ func _process(delta: float) -> void:
 	# 原始按住状态（未过延迟也算按住）：延迟期间保持偏移、不归位
 	var held: bool = target.has_method("is_aim_held") and target.is_aim_held()
 
-	# ── 瞄准偏移 ──
+	# ── 瞄准偏移（存于视野本地坐标系：旋转视野时偏移随视角刚性公转，屏幕上始终朝鼠标方向）──
 	if aiming:
 		var target_aim := Vector3.ZERO
 		if target.has_method("get_mouse_ground_position"):
 			var mw: Vector3 = target.get_mouse_ground_position()
 			var pg: Vector3 = Vector3(tp.x, 0.0, tp.z)
 			var dm: Vector3 = mw - pg
+			dm.y = 0.0
+			dm = dm.rotated(Vector3.UP, -view_rad)
 			if dm.length() > 0.01:
 				var vision: float = 5.0
 				var v = target.get("vision_range")
@@ -100,7 +102,7 @@ func _process(delta: float) -> void:
 		_aim_speed = 0.0
 		_aim_offset = _aim_offset.move_toward(Vector3.ZERO, AIM_RETURN_SPEED * delta)
 
-	# ── 位置追踪 —— 瞄准时随 _aim_offset 偏移，否则有偏差才追；整个水平偏移随视野旋转绕目标公转 ──
+	# ── 位置追踪 —— 瞄准时随 _aim_offset 偏移，否则有偏差才追；整个水平偏移（视野本地系）随视野旋转绕目标公转 ──
 	var horiz := (back_offset + Vector3(_aim_offset.x, 0.0, _aim_offset.z)).rotated(Vector3.UP, view_rad)
 	var raw_pos := Vector3(tp.x, tp.y + HEIGHT, tp.z) + horiz
 	if _follow_pos == Vector3.ZERO:
