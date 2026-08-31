@@ -1,10 +1,16 @@
-# TopDownGame3D v3.6.1
+# TopDownGame3D v3.6.2
 
-> Godot 4.7.1 · 俯视角 3D · 全 GDScript · 2026-08-18
+> Godot 4.7.1 · 俯视角 3D · 全 GDScript · 2026-08-31
 
 ---
 
 ## 0. 更新记录
+
+### v3.6.2
+
+- 新增视野旋转：**左Ctrl** 视野逆时针旋转 90°、**左Alt** 顺时针旋转 90°，绕人物平滑公转（约 0.5s），用于观察障碍物遮挡处。
+- 旋转期间位置追踪增益临时提升，人物不会因公转甩出画面；瞄准状态下同样可旋转。
+- 玩家移动方向随视野旋转，W 始终朝屏幕上方；按键设置面板支持重绑定两个新动作。
 
 ### v3.6.1
 
@@ -86,7 +92,7 @@ topdown_game_3d-v3/
 │   ├── equipment.gd           # 光源装备（继承 ItemData：手电筒/火把）
 │   ├── equipment_manager.gd   # 装备管理器：功能装备(F)/武器(Q)/消耗品(1/2/3) 三区管理，冷却系统
 │   ├── equipment_hud.gd       # 底部装备栏：三区布局 + 冷却覆盖动画
-│   ├── camera_follow_3d.gd    # 摄像机：位置/角度偏差驱动追踪 + 瞄准偏移
+│   ├── camera_follow_3d.gd    # 摄像机：位置/角度偏差驱动追踪 + 瞄准偏移 + 视野90°旋转
 │   ├── minimap_3d.gd          # 小地图（左上角 220×220，障碍物+动物渲染）
 │   ├── day_night_cycle.gd     # ★ 昼夜循环：day_progress 归一化进度，seconds_per_day 单点配置
 │   ├── animal_spawner.gd      # 动物生成（+血量/掉落生肉）
@@ -133,7 +139,8 @@ world_3d._ready()
 
 | 按键 | 功能 |
 |------|------|
-| WASD / 鼠标 / Space | 移动 / 朝向 / 跳跃 |
+| WASD / 鼠标 / Space | 移动（方向随视野旋转，W 恒为屏幕上方）/ 朝向 / 跳跃 |
+| **左Ctrl / 左Alt** | **视野逆时针 / 顺时针旋转 90°**（绕人物平滑公转，观察障碍物遮挡处） |
 | **鼠标左键** | 近战攻击（手持武器用武器参数，否则拳头） |
 | **F** | 切换功能装备（手电筒→火把→关） |
 | **Q** | 切换武器（木剑→关） |
@@ -191,6 +198,13 @@ var current_speed: float = speed * 0.25 if is_aiming() else speed
 - 位置向鼠标方向 **匀速偏移**（`AIM_SPEED` = 8m/s）
 - 松开后 `_aim_offset` 匀速归零（`AIM_RETURN_SPEED` = 10m/s），恢复正常追踪
 
+**视野旋转**（左Ctrl 逆时针 / 左Alt 顺时针）
+- 每按一次旋转 90°，绕人物平滑公转（`VIEW_ROTATE_SPEED` = 180°/s），用于观察障碍物遮挡处
+- 视野偏航是独立于追踪逻辑的外层角度：位置偏移向量整体绕 Y 轴公转，角度追踪在视野本地坐标系内仍限幅 ±4°
+- 旋转期间位置追踪增益临时提升（`ROTATE_TRACK_RATE`），防止公转弧线速度快导致人物甩出画面
+- 玩家移动方向同步随视野旋转（`player_3d.gd`），W 始终朝屏幕上方
+- 瞄准状态下同样可旋转；小地图保持世界朝向不跟随旋转
+
 | 参数 | 值 | 说明 |
 |------|-----|------|
 | `HEIGHT` | 10.0 | 摄像机距地面高度 |
@@ -203,6 +217,9 @@ var current_speed: float = speed * 0.25 if is_aiming() else speed
 | `LOOK_SPEED_FACTOR` | 1.0 | 角度转速系数（°/s/°） |
 | `AIM_SPEED` | 8.0 | 瞄准偏移速度（m/s） |
 | `AIM_RETURN_SPEED` | 10.0 | 松开右键归位速度（m/s） |
+| `VIEW_ROTATE_STEP` | 90° | 视野每次旋转角度 |
+| `VIEW_ROTATE_SPEED` | 180°/s | 视野旋转速度（90° 约 0.5s） |
+| `ROTATE_TRACK_RATE` | 20.0 | 旋转期间位置追踪增益（1/s） |
 
 ---
 

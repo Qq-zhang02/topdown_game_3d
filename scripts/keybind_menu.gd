@@ -18,6 +18,8 @@ const ACTIONS := [
 	{"id": "inventory_toggle", "label": "背包", "default": KEY_TAB},
 	{"id": "build_menu",  "label": "建造菜单", "default": KEY_B},
 	{"id": "build_rotate", "label": "旋转建筑", "default": KEY_R},
+	{"id": "camera_rotate_left",  "label": "视野逆时针旋转 90°", "default": KEY_CTRL},
+	{"id": "camera_rotate_right", "label": "视野顺时针旋转 90°", "default": KEY_ALT},
 	{"id": "pause",       "label": "暂停",     "default": KEY_ESCAPE},
 ]
 

@@ -30,6 +30,13 @@ const AIM_SPEED: float = 8.0             # 瞄准偏移最大速度（m/s）
 const AIM_RETURN_SPEED: float = 10.0     # 松开右键后偏移归位速度（m/s）
 const AIM_ACCEL: float = 60.0            # 瞄准偏移加速度（m/s²），进入瞄准时平滑起步、不突跳
 
+# ═══════════════════════════════════════════
+# 视野旋转 — 左Ctrl 逆时针 / 左Alt 顺时针，每次 90°，绕目标平滑公转
+# ═══════════════════════════════════════════
+const VIEW_ROTATE_STEP: float = 90.0     # 每次旋转角度（度）
+const VIEW_ROTATE_SPEED: float = 180.0   # 旋转速度（度/s），90° 约 0.5s
+const ROTATE_TRACK_RATE: float = 20.0    # 旋转期间位置追踪增益（1/s），防止公转时人物甩出屏幕
+
 # ── 内部状态 ──
 var _follow_pos := Vector3.ZERO
 var _aim_offset := Vector3.ZERO
@@ -39,6 +46,8 @@ var _was_aiming: bool = false
 var _aim_pitch: float = 0.0
 var _aim_yaw: float = 0.0
 var _aim_speed: float = 0.0             # 当前瞄准偏移速度（由 AIM_ACCEL 平滑加速到 AIM_SPEED）
+var _view_yaw: float = 0.0              # 当前视野偏航（度）
+var _view_yaw_target: float = 0.0       # 目标视野偏航（度，按一次 ±90 累计）
 
 
 func _ready() -> void:
@@ -51,6 +60,15 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if not target:
 		return
+
+	# ── 视野旋转（90° 步进，平滑过渡）──
+	if Input.is_action_just_pressed("camera_rotate_left"):
+		_view_yaw_target += VIEW_ROTATE_STEP
+	if Input.is_action_just_pressed("camera_rotate_right"):
+		_view_yaw_target -= VIEW_ROTATE_STEP
+	_view_yaw = move_toward(_view_yaw, _view_yaw_target, VIEW_ROTATE_SPEED * delta)
+	var view_rad := deg_to_rad(_view_yaw)
+	var rotating := absf(_view_yaw_target - _view_yaw) > 0.01
 
 	var tp: Vector3 = target.global_position
 	var back_offset: Vector3 = Vector3(0, 0, HEIGHT * cos(deg_to_rad(TILT_ANGLE)))
@@ -82,8 +100,9 @@ func _process(delta: float) -> void:
 		_aim_speed = 0.0
 		_aim_offset = _aim_offset.move_toward(Vector3.ZERO, AIM_RETURN_SPEED * delta)
 
-	# ── 位置追踪 —— 瞄准时随 _aim_offset 偏移，否则有偏差才追 ──
-	var raw_pos := Vector3(tp.x + _aim_offset.x, tp.y + HEIGHT, tp.z + _aim_offset.z) + back_offset
+	# ── 位置追踪 —— 瞄准时随 _aim_offset 偏移，否则有偏差才追；整个水平偏移随视野旋转绕目标公转 ──
+	var horiz := (back_offset + Vector3(_aim_offset.x, 0.0, _aim_offset.z)).rotated(Vector3.UP, view_rad)
+	var raw_pos := Vector3(tp.x, tp.y + HEIGHT, tp.z) + horiz
 	if _follow_pos == Vector3.ZERO:
 		_follow_pos = raw_pos
 
@@ -92,11 +111,15 @@ func _process(delta: float) -> void:
 		var pos_dist := _follow_pos.distance_to(raw_pos)
 		if pos_dist > 0.001:
 			var pos_speed := maxf(POS_MIN_SPEED + pos_dist * POS_SPEED_FACTOR, _aim_speed)
+			if rotating:
+				pos_speed = maxf(pos_speed, pos_dist * ROTATE_TRACK_RATE)
 			_follow_pos = _follow_pos.move_toward(raw_pos, pos_speed * delta)
 	else:
 		var pos_dist := _follow_pos.distance_to(raw_pos)
 		if pos_dist > 0.001:
 			var pos_speed := POS_MIN_SPEED + pos_dist * POS_SPEED_FACTOR
+			if rotating:
+				pos_speed = maxf(pos_speed, pos_dist * ROTATE_TRACK_RATE)
 			_follow_pos = _follow_pos.move_toward(raw_pos, pos_speed * delta)
 	global_position = _follow_pos
 
@@ -119,7 +142,9 @@ func _process(delta: float) -> void:
 		var lt := tp + Vector3(0, 1.5, 0)
 		var d := (lt - global_position).normalized()
 		var tp_pitch := clampf(asin(d.y), def_pitch - limit, def_pitch + limit)
-		var tp_yaw := clampf(-atan2(d.x, -d.z), -limit, limit)
+		# 转到视野本地坐标系再求偏航：追踪围绕视野旋转角（而非固定的世界正南）
+		var d_local := d.rotated(Vector3.UP, -view_rad)
+		var tp_yaw := clampf(-atan2(d_local.x, -d_local.z), -limit, limit)
 		var ad := absf(tp_pitch - _look_pitch) + absf(tp_yaw - _look_yaw)
 		if ad > 0.0001:
 			var asp := deg_to_rad(LOOK_MIN_SPEED) + ad * LOOK_SPEED_FACTOR
@@ -127,4 +152,4 @@ func _process(delta: float) -> void:
 			_look_yaw = move_toward(_look_yaw, tp_yaw, asp * delta)
 
 	_was_aiming = aiming
-	rotation = Vector3(_look_pitch, _look_yaw, 0.0)
+	rotation = Vector3(_look_pitch, _look_yaw + view_rad, 0.0)

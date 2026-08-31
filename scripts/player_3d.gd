@@ -454,9 +454,12 @@ func _physics_process(delta: float) -> void:
 		_aim_held_time = -1.0
 
 	var input_dir := Input.get_vector("move_left", "move_right", "move_up", "move_down")
+	# 移动方向随视野旋转：W 始终朝屏幕上方（摄像机公转后世界轴会斜着走）
+	var cam: Camera3D = get_viewport().get_camera_3d()
+	var move_dir := input_dir.rotated(-cam.global_rotation.y if cam else 0.0)
 	var current_speed: float = speed * 0.25 if is_aiming() else speed #瞄准状态下减速
-	velocity.x = input_dir.x * current_speed
-	velocity.z = input_dir.y * current_speed
+	velocity.x = move_dir.x * current_speed
+	velocity.z = move_dir.y * current_speed
 	# 击退（叠加后衰减）
 	velocity += _knockback
 	_knockback = _knockback.lerp(Vector3.ZERO, delta * 4.0)
