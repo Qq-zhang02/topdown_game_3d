@@ -9,6 +9,7 @@ class_name BuildingData
 @export var color: Color = Color(0.6, 0.5, 0.4)
 @export var cost: Dictionary = {}               # 材料消耗 {"wood": 5}
 @export var scene_path: String = ""             # 建筑外观场景预制体（空则回退 BoxMesh 默认 1x1x1）
+@export var logic_script: String = ""           # 放置时挂载的交互脚本（需实现 setup(data, player, day_night, state) 与 get_state()），如简易火把
 
 
 ## 从预制体的 mesh AABB 计算建筑尺寸（幽灵预览/占地/放置用）
@@ -79,5 +80,7 @@ static func _compute_aabb_size(node: Node3D) -> Vector3:
 # ── 交互（篝火点火/加柴）：fuel_item_id 非空则放置时挂载交互逻辑，发光/危险区只在该建筑"点燃"后生效 ──
 @export var fuel_item_id: String = ""       # 燃料物品ID（如 "wood"）
 @export var fuel_per_ignite: int = 0        # 每次点燃消耗的燃料数量（0 = 不可交互点火）
+@export var fuel_per_refuel: int = 0        # 燃烧中可追加的燃料数量（0 = 不可追加），追加后燃料补满
+@export var refuel_threshold: float = 0.5   # 追加阈值：剩余燃料比例 ≤ 该值时才可交互追加
 @export var burn_duration_hours: float = 0.0 # 单次燃烧时长（游戏小时）
 @export var interaction_range: float = 2.5  # 交互半径（米，玩家需靠近即可按交互键）

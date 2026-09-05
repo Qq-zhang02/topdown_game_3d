@@ -9,20 +9,21 @@ display_name = "篝火"
 description = "照亮黑夜，温暖人心"
 color = Color(0.45, 0.28, 0.12, 1)
 cost = {
-"stone": 3,
-"wood": 2
+"stone": 3
 }
 scene_path = "res://scenes/prefabs/building_campfire.tscn"
 emits_light = true
 light_energy = 3.5
 light_range = 9.0
-fuel_item_id = "wood"
-fuel_per_ignite = 3
-burn_duration_hours = 6.0
-interaction_range = 1.8
 hazard_damage = 1.0
 hazard_interval = 0.25
 hazard_knockback = 4.0
 hazard_knockback_up = 2.0
 hazard_animal_damage_multiplier = 1.5
 hazard_animal_knockback_multiplier = 2.0
+fuel_item_id = "wood"
+fuel_per_ignite = 3
+fuel_per_refuel = 2
+refuel_threshold = 0.5
+burn_duration_hours = 6.0
+interaction_range = 1.8

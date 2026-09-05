@@ -9,6 +9,7 @@ display_name = "木地基"
 description = "一块平稳的木制平台"
 color = Color(0.6, 0.45, 0.25, 1)
 cost = {
+"stone": 2,
 "wood": 6
 }
 scene_path = "res://scenes/prefabs/building_foundation.tscn"

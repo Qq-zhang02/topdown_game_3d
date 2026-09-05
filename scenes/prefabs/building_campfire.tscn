@@ -71,18 +71,21 @@ shape = SubResource("SphereShape3D_l35qi")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5167054, 0)
 visible = false
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1345505363]
+[node name="Log1" type="MeshInstance3D" parent="." unique_id=1345505363]
 transform = Transform3D(0.68388844, -0.6838885, -0.2541523, 0.7071068, 0.70710677, 0, 0.17971282, -0.1797128, 0.9671643, -0.052575506, 0.15919048, -0.01379434)
+visible = false
 material_override = SubResource("StandardMaterial3D_2dim1")
 mesh = SubResource("BoxMesh_51err")
 
-[node name="MeshInstance3D2" type="MeshInstance3D" parent="." unique_id=1101284186]
+[node name="Log2" type="MeshInstance3D" parent="." unique_id=1101284186]
 transform = Transform3D(-0.41421014, 0.41421008, 0.810469, 0.7071068, 0.70710677, 2.544516e-08, -0.5730881, 0.57308817, -0.5857815, 0.037429333, 0.1569894, 0.09700501)
+visible = false
 material_override = SubResource("StandardMaterial3D_2dim1")
 mesh = SubResource("BoxMesh_51err")
 
-[node name="MeshInstance3D3" type="MeshInstance3D" parent="." unique_id=1435586519]
+[node name="Log3" type="MeshInstance3D" parent="." unique_id=1435586519]
 transform = Transform3D(-0.43483454, 0.43483472, -0.7885668, 0.7071068, 0.70710677, 5.089032e-08, 0.557601, -0.557601, -0.614949, 0.025912642, 0.1569894, -0.0527125)
+visible = false
 material_override = SubResource("StandardMaterial3D_2dim1")
 mesh = SubResource("BoxMesh_51err")
 

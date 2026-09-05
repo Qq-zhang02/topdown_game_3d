@@ -1,20 +1,232 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=18 format=3]
 
-[sub_resource type="BoxMesh" id="BoxMesh_wall"]
-size = Vector3(3, 2.5, 0.3)
+[sub_resource type="BoxMesh" id="BoxMesh_sill"]
+size = Vector3(2.96, 0.18, 0.26)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wall"]
-albedo_color = Color(0.55, 0.38, 0.2, 1)
+[sub_resource type="BoxMesh" id="BoxMesh_plate"]
+size = Vector3(2.96, 0.16, 0.26)
+
+[sub_resource type="BoxMesh" id="BoxMesh_post"]
+size = Vector3(0.16, 2.16, 0.26)
+
+[sub_resource type="BoxMesh" id="BoxMesh_plank_thick"]
+size = Vector3(2.64, 0.28, 0.24)
+
+[sub_resource type="BoxMesh" id="BoxMesh_plank_thin"]
+size = Vector3(2.64, 0.28, 0.22)
+
+[sub_resource type="BoxMesh" id="BoxMesh_plank_thick_b"]
+size = Vector3(2.62, 0.28, 0.24)
+
+[sub_resource type="BoxMesh" id="BoxMesh_plank_thin_b"]
+size = Vector3(2.62, 0.28, 0.22)
+
+[sub_resource type="BoxMesh" id="BoxMesh_core"]
+size = Vector3(2.6, 2.15, 0.23)
+
+[sub_resource type="BoxMesh" id="BoxMesh_brace"]
+size = Vector3(3.3, 0.14, 0.04)
+
+[sub_resource type="BoxMesh" id="BoxMesh_strap_h"]
+size = Vector3(2.68, 0.16, 0.02)
+
+[sub_resource type="BoxMesh" id="BoxMesh_strap_v"]
+size = Vector3(0.08, 0.5, 0.02)
+
+[sub_resource type="StandardMaterial3D" id="Mat_frame"]
+albedo_color = Color(0.36, 0.25, 0.14, 1)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="Mat_plank_a"]
+albedo_color = Color(0.62, 0.47, 0.28, 1)
 roughness = 0.8
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_wall"]
+[sub_resource type="StandardMaterial3D" id="Mat_plank_b"]
+albedo_color = Color(0.57, 0.42, 0.245, 1)
+roughness = 0.8
+
+[sub_resource type="StandardMaterial3D" id="Mat_plank_c"]
+albedo_color = Color(0.52, 0.385, 0.215, 1)
+roughness = 0.8
+
+[sub_resource type="StandardMaterial3D" id="Mat_back"]
+albedo_color = Color(0.2, 0.14, 0.08, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="Mat_metal"]
+albedo_color = Color(0.3, 0.31, 0.34, 1)
+metallic = 0.85
+roughness = 0.4
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_col"]
 size = Vector3(3, 2.5, 0.3)
 
 [node name="WoodenWall" type="StaticBody3D"]
 
-[node name="Mesh" type="MeshInstance3D" parent="."]
-mesh = SubResource("BoxMesh_wall")
-material_override = SubResource("StandardMaterial3D_wall")
+[node name="Sill" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.16, 0)
+material_override = SubResource("Mat_frame")
+mesh = SubResource("BoxMesh_sill")
+
+[node name="Plate" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.17, 0)
+material_override = SubResource("Mat_frame")
+mesh = SubResource("BoxMesh_plate")
+
+[node name="PostLeft" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.42, 0.01, 0)
+material_override = SubResource("Mat_frame")
+mesh = SubResource("BoxMesh_post")
+
+[node name="PostRight" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.42, 0.01, 0)
+material_override = SubResource("Mat_frame")
+mesh = SubResource("BoxMesh_post")
+
+[node name="Core" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.01, 0)
+material_override = SubResource("Mat_back")
+mesh = SubResource("BoxMesh_core")
+
+[node name="PlankF1" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.92, 0.01)
+material_override = SubResource("Mat_plank_a")
+mesh = SubResource("BoxMesh_plank_thick")
+
+[node name="PlankF2" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.61, 0.01)
+material_override = SubResource("Mat_plank_b")
+mesh = SubResource("BoxMesh_plank_thin")
+
+[node name="PlankF3" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.3, 0.01)
+material_override = SubResource("Mat_plank_c")
+mesh = SubResource("BoxMesh_plank_thick")
+
+[node name="PlankF4" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.01, 0.01)
+material_override = SubResource("Mat_plank_b")
+mesh = SubResource("BoxMesh_plank_thin")
+
+[node name="PlankF5" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0.01)
+material_override = SubResource("Mat_plank_a")
+mesh = SubResource("BoxMesh_plank_thick")
+
+[node name="PlankF6" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.63, 0.01)
+material_override = SubResource("Mat_plank_c")
+mesh = SubResource("BoxMesh_plank_thin")
+
+[node name="PlankF7" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.94, 0.01)
+material_override = SubResource("Mat_plank_b")
+mesh = SubResource("BoxMesh_plank_thick")
+
+[node name="PlankB1" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.92, -0.01)
+material_override = SubResource("Mat_plank_a")
+mesh = SubResource("BoxMesh_plank_thick_b")
+
+[node name="PlankB2" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.61, -0.01)
+material_override = SubResource("Mat_plank_b")
+mesh = SubResource("BoxMesh_plank_thin_b")
+
+[node name="PlankB3" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.3, -0.01)
+material_override = SubResource("Mat_plank_c")
+mesh = SubResource("BoxMesh_plank_thick_b")
+
+[node name="PlankB4" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.01, -0.01)
+material_override = SubResource("Mat_plank_b")
+mesh = SubResource("BoxMesh_plank_thin_b")
+
+[node name="PlankB5" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, -0.01)
+material_override = SubResource("Mat_plank_a")
+mesh = SubResource("BoxMesh_plank_thick_b")
+
+[node name="PlankB6" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.63, -0.01)
+material_override = SubResource("Mat_plank_c")
+mesh = SubResource("BoxMesh_plank_thin_b")
+
+[node name="PlankB7" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.94, -0.01)
+material_override = SubResource("Mat_plank_b")
+mesh = SubResource("BoxMesh_plank_thick_b")
+
+[node name="BraceFront" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.777146, -0.62932, 0, 0.62932, 0.777146, 0, 0, 0, 1, 0, 0.01, 0.12)
+material_override = SubResource("Mat_frame")
+mesh = SubResource("BoxMesh_brace")
+
+[node name="BraceBack" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.777146, 0.62932, 0, -0.62932, 0.777146, 0, 0, 0, 1, 0, 0.01, -0.12)
+material_override = SubResource("Mat_frame")
+mesh = SubResource("BoxMesh_brace")
+
+[node name="StrapHFUp" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.55, 0.14)
+material_override = SubResource("Mat_metal")
+mesh = SubResource("BoxMesh_strap_h")
+
+[node name="StrapHFDown" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.55, 0.14)
+material_override = SubResource("Mat_metal")
+mesh = SubResource("BoxMesh_strap_h")
+
+[node name="StrapHBUp" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.55, -0.14)
+material_override = SubResource("Mat_metal")
+mesh = SubResource("BoxMesh_strap_h")
+
+[node name="StrapHBDown" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.55, -0.14)
+material_override = SubResource("Mat_metal")
+mesh = SubResource("BoxMesh_strap_h")
+
+[node name="StrapVF1" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.42, 0.77, 0.14)
+material_override = SubResource("Mat_metal")
+mesh = SubResource("BoxMesh_strap_v")
+
+[node name="StrapVF2" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.42, -0.77, 0.14)
+material_override = SubResource("Mat_metal")
+mesh = SubResource("BoxMesh_strap_v")
+
+[node name="StrapVF3" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.42, 0.77, 0.14)
+material_override = SubResource("Mat_metal")
+mesh = SubResource("BoxMesh_strap_v")
+
+[node name="StrapVF4" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.42, -0.77, 0.14)
+material_override = SubResource("Mat_metal")
+mesh = SubResource("BoxMesh_strap_v")
+
+[node name="StrapVB1" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.42, 0.77, -0.14)
+material_override = SubResource("Mat_metal")
+mesh = SubResource("BoxMesh_strap_v")
+
+[node name="StrapVB2" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.42, -0.77, -0.14)
+material_override = SubResource("Mat_metal")
+mesh = SubResource("BoxMesh_strap_v")
+
+[node name="StrapVB3" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.42, 0.77, -0.14)
+material_override = SubResource("Mat_metal")
+mesh = SubResource("BoxMesh_strap_v")
+
+[node name="StrapVB4" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.42, -0.77, -0.14)
+material_override = SubResource("Mat_metal")
+mesh = SubResource("BoxMesh_strap_v")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
-shape = SubResource("BoxShape3D_wall")
+shape = SubResource("BoxShape3D_col")

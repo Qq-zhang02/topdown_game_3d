@@ -759,12 +759,15 @@ func place_building(data: Resource, pos: Vector3, rot_y: float, from_save: bool 
 						ol.omni_attenuation = data.get("light_attenuation")
 						ol.shadow_enabled = data.get("light_shadow_enabled")
 				# 用实际实例的 AABB 计算占地（更准确，含缩放）
-				var nsz := BuildingData._compute_aabb_size(n)
+				var aabb := BuildingData._compute_aabb(n)
+				var nsz := aabb.size
 				if nsz != Vector3.ZERO:
 					bsize = nsz
 				# 危险区：触碰扣血 + 击退（篝火由交互组件控制：仅燃烧时生效）
+				# ★ 传入网格本地最低点：居中建模的建筑（如简易火把）危险区需随之下移覆盖实体。
+				#   _compute_aabb 在树内返回全局 AABB，需减去放置高度换算回本地。
 				if data.get("hazard_damage") > 0.0:
-					_attach_hazard(n, bsize, data)
+					_attach_hazard(n, bsize, data, aabb.position.y - n.position.y)
 
 	if not used_scene:
 		# 回退：程序化 BoxMesh + 颜色 + 灯光（用 get_size 默认 1×1×1）
@@ -805,11 +808,21 @@ func place_building(data: Resource, pos: Vector3, rot_y: float, from_save: bool 
 		if data.hazard_damage > 0.0:
 			_attach_hazard(body, bsize, data)
 
-	# 交互式建筑（篝火点火）：初始不发光，靠近按 E 加柴点燃，燃烧完可再加（状态可存档恢复）
-	var fuel_cfg = data.get("fuel_item_id")
-	var fuel_qty := int(data.get("fuel_per_ignite"))
-	if building_node and fuel_cfg != null and str(fuel_cfg) != "" and fuel_qty > 0:
-		_attach_campfire_logic(building_node, data, state)
+	# 交互式建筑：优先挂载通用逻辑脚本（logic_script），否则按燃料配置挂载篝火点火逻辑
+	# （两者都支持状态存档：子节点需实现 get_state()）
+	if building_node:
+		var logic_path: String = data.get("logic_script") if data.get("logic_script") != null else ""
+		if not logic_path.is_empty() and ResourceLoader.exists(logic_path):
+			var logic := Node.new()
+			logic.set_script(load(logic_path))
+			logic.name = "BuildingLogic"
+			building_node.add_child(logic)
+			logic.setup(data, _player, _day_night, state)
+		else:
+			var fuel_cfg = data.get("fuel_item_id")
+			var fuel_qty := int(data.get("fuel_per_ignite"))
+			if fuel_cfg != null and str(fuel_cfg) != "" and fuel_qty > 0:
+				_attach_campfire_logic(building_node, data, state)
 
 	# 记录节点引用（存档时取篝火燃烧状态用）
 	if building_node and not from_save and _buildings_data.size() > 0:
@@ -836,7 +849,8 @@ func _attach_campfire_logic(building: Node3D, data: Resource, state: Dictionary)
 
 
 ## 为建筑附加危险区（触碰扣血 + 击退），Area3D 覆盖建筑占地范围
-func _attach_hazard(building: Node3D, size: Vector3, data: Resource) -> void:
+## min_y：网格 AABB 最低点（居中建模的建筑网格从负 Y 开始，盒子需整体下移对齐实体）
+func _attach_hazard(building: Node3D, size: Vector3, data: Resource, min_y: float = 0.0) -> void:
 	var HazardScript := load("res://scripts/combat/hazard.gd")
 	var hazard: Area3D = Area3D.new()
 	hazard.name = "Hazard"
@@ -853,7 +867,7 @@ func _attach_hazard(building: Node3D, size: Vector3, data: Resource) -> void:
 	var shape := BoxShape3D.new()
 	shape.size = Vector3(maxf(size.x, 0.5), maxf(size.y, 0.5), maxf(size.z, 0.5))
 	col.shape = shape
-	col.position = Vector3(0, size.y * 0.5, 0)
+	col.position = Vector3(0, size.y * 0.5 + min_y, 0)
 	hazard.add_child(col)
 	building.add_child(hazard)
 
@@ -1319,12 +1333,13 @@ func _collect_world_data() -> Dictionary:
 			"px": bp.x, "py": bp.y, "pz": bp.z,
 			"rot_y": b.rot_y,
 		}
-		# 篝火等交互建筑：保存燃烧状态（点燃中 + 剩余游戏小时）
+		# 篝火/火把等交互建筑：保存逻辑子节点状态（任何实现 get_state() 的子节点）
 		var bnode = b.get("node")
 		if bnode and is_instance_valid(bnode):
-			var logic: Node = bnode.get_node_or_null("CampfireLogic")
-			if logic and logic.has_method("get_state"):
-				entry["state"] = logic.get_state()
+			for child in bnode.get_children():
+				if child.has_method("get_state"):
+					entry["state"] = child.get_state()
+					break
 		buildings.append(entry)
 
 	var animal_count := 0

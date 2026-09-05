@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="BuildingData" format=3 uid="uid://dkt2vpy7r1xax"]
+
+[ext_resource type="Script" uid="uid://dlofvy55fdt4t" path="res://scripts/building/building_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "simple_torch"
+display_name = "简易火把"
+description = "一根燃烧的火把，提供小范围照明"
+color = Color(1, 0.62, 0.25, 1)
+cost = {
+"wood": 1
+}
+scene_path = "res://scenes/prefabs/building_simple_torch.tscn"
+logic_script = "res://scripts/building/simple_torch.gd"
+emits_light = true
+light_color = Color(1, 0.7, 0.35, 1)
+light_energy = 2.2
+light_range = 6.0
+hazard_damage = 1.0
+hazard_interval = 3600.0
+hazard_knockback = 4.0
+hazard_knockback_up = 2.0
+hazard_animal_damage_multiplier = 1.5
+hazard_animal_knockback_multiplier = 2.0
+burn_duration_hours = 4.0

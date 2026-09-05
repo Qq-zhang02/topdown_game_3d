@@ -1,15 +1,25 @@
-# TopDownGame3D v3.7.0
+# TopDownGame3D v3.7.1
 
-> Godot 4.7.1 · 俯视角 3D · 全 GDScript · 2026-09-01
+> Godot 4.7.1 · 俯视角 3D · 全 GDScript · 2026-09-06
 
 ---
 
 ## 0. 更新记录
 
+### v3.7.1
+
+- **建筑外观重做**：木地基（石砌基脚 + 暗色木基体 + 顶部框架 + 拼板甲板 + 金属包角）、木墙（双面对称：框架结构 + 三色横拼板 + 对角斜撑 + 金属拉带），不再是纯色方块；建造占地/AABB 保持不变。
+- **建造消耗调整**：篝火 3 石头、简易火把 1 木材、木墙 3 木材、木地基 2 石头 + 6 木材。
+- **篝火交互完善**：放置后仅显示石头；靠近按 **E** 消耗 3 木材点燃（木柴+火焰出现）；燃烧时木柴随剩余燃料变小；剩余燃料 ≤50% 时可按 **E** 消耗 2 木材补满；燃尽后木柴消失，需重新消耗 3 木材点燃。`BuildingData` 新增 `fuel_per_refuel` / `refuel_threshold` 配置。
+- **新增建筑：简易火把**（1 木材）：放置即燃烧 4 游戏小时，木杆随燃烧变短、火焰/灯光跟随燃烧端；被玩家/动物碰到立即翻倒（远离碰撞者、贴地）、受一次伤害并击退，火焰数秒渐熄后整支沉入地底消失（占地同步释放）。
+- **通用建筑逻辑挂载**：`BuildingData.logic_script` 指向交互脚本（实现 `setup()` / `get_state()` 即可），放置时自动挂载；存档自动保存/恢复任何实现 `get_state()` 的建筑子节点状态。
+- **危险区对齐修复**：碰撞盒改为覆盖建筑网格实际范围（修正居中建模建筑——如简易火把——危险区悬空，导致小动物无法触发的问题）。
+- **命名调整**：建筑"简易火把"使用 `simple_torch`（id / 脚本 / 预制体），与手持装备 `torch`（火把）区分。
+
 ### v3.7.0
 
-- 篝火交互玩法：建造材料改为 **3 石头 + 2 木材**，放置后**不发光**（无火焰/无光源/危险区关闭）。
-- 靠近篝火（1.8m 内）显示浮动提示 `[E] 添加木柴 ×3`（木材不足时变红色提示），按 **E** 消耗背包木材点燃，燃烧 **6 游戏小时**。
+- 篝火交互玩法：放置后**不发光**（无火焰/无光源/危险区关闭）。
+- 靠近篝火（1.8m 内）显示浮动提示（木材不足时变红色提示），按 **E** 消耗背包木材点燃，燃烧 **6 游戏小时**。
 - 燃烧期间：火光闪烁 + 火焰锥形发光体 + 危险区恢复（触碰扣血/击退，小动物受 1.5 倍伤害）。
 - 熄灭后自动回到未点燃状态，可**再次靠近按 E 添加木柴**循环使用。
 - 篝火燃烧状态（点燃中 + 剩余时长）随存档保存/恢复；远离时提示自动隐藏，近距离才显示。
@@ -63,14 +73,17 @@ topdown_game_3d-v3/
 │       ├── tree.tscn / rock.tscn          # 资源节点（外观可编辑，位置代码随机）
 │       ├── pickup.tscn                    # 掉落物
 │       ├── obstacle.tscn                  # 障碍物（单位尺寸，运行时缩放）
-│       └── building_campfire / building_foundation / building_wooden_wall.tscn
+│       └── building_campfire.tscn         # 篝火（石头+木柴+火焰+提示）
+│       ├── building_foundation.tscn       # 木地基（石基+拼板甲板+金属包角）
+│       ├── building_wooden_wall.tscn      # 木墙（双面对称框架+拼板+斜撑+拉带）
+│       └── building_simple_torch.tscn     # 简易火把（木杆+绑扎+火焰+灯光）
 ├── data/                      # ★ 数据驱动内容：新增物品/建筑 = 加 .tres，零代码
 │   ├── items/                 # 物品（ItemDB 自动扫描，按 id 取用）
 │   │   ├── wood.tres / stone.tres / meat.tres
 │   │   ├── weapons/sword_wood.tres
-│   │   └── equipment/flashlight.tres / torch.tres
+│   │   └── equipment/flashlight.tres / torch.tres（手持火把装备）
 │   └── buildings/             # 建筑配方（BuildController 自动扫描）
-│       ├── campfire.tres / wooden_wall.tres / foundation.tres
+│       ├── campfire.tres / simple_torch.tres / wooden_wall.tres / foundation.tres
 ├── scripts/
 │   ├── core/
 │   │   ├── item_data.gd       # 物品基类 Resource（ItemType: MATERIAL/EQUIPMENT/WEAPON）
@@ -83,12 +96,14 @@ topdown_game_3d-v3/
 │   ├── combat/
 │   │   ├── health.gd          # 通用血量组件（受击红闪+溅射粒子，自动覆盖所有挂载者）
 │   │   ├── melee_controller.gd# 近战：左键扇形判定，伤害取自当前 WeaponData
-│   │   ├── hazard.gd          # ★ 危险区组件：触碰扣血+击退（篝火/地刺等）
+│   │   ├── hazard.gd          # ★ 危险区组件：触碰扣血+击退（篝火/火把/地刺等）
 │   │   └── pickup.gd          # 掉落物：上抛弹跳→滑行→可拾取，射线贴合地形，飞向角色消失
 │   ├── building/
-│   │   ├── building_data.gd   # 建筑定义：尺寸/颜色/材料消耗/发光
+│   │   ├── building_data.gd   # 建筑定义：外观/消耗/光源/危险区/交互脚本挂载
 │   │   ├── build_controller.gd# 建造模式：幽灵预览(绿/红)+网格吸附+R旋转，贴合地形高度
-│   │   └── build_menu_ui.gd   # 建造菜单：配方列表，材料不足置灰
+│   │   ├── build_menu_ui.gd   # 建造菜单：配方列表，材料不足置灰
+│   │   ├── campfire.gd        # 篝火交互逻辑：点燃/追加燃料/木柴消耗/存档
+│   │   └── simple_torch.gd    # 简易火把逻辑：燃烧计时/翻倒/沉地消失/一次性伤害
 │   ├── world/
 │   │   ├── lava.gd            # 岩浆：滚动熔岩表面，越界落入岩浆持续掉血
 │   │   ├── resource_node.gd   # 可采集资源：树(掉木材)/石头(掉石头)
@@ -97,7 +112,7 @@ topdown_game_3d-v3/
 │   │   └── weapon_data.gd     # 近战武器数据（继承 ItemData）
 │   ├── vfx/
 │   │   └── thrust_beam_vfx.gd # 突刺光束 VFX：光束+溅射粒子+尖端爆开（0.2s 时序）
-│   ├── world_3d.gd            # 世界总管（占地登记/建造放置/地形加载/各系统组装）
+│   ├── world_3d.gd            # 世界总管（占地登记/建造放置/危险区挂载/地形加载/各系统组装）
 │   ├── player_3d.gd           # 玩家：移动/朝向(反应速度阻尼)/装备/血量/背包/近战/动画
 │   ├── equipment.gd           # 光源装备（继承 ItemData：手电筒/火把）
 │   ├── equipment_manager.gd   # 装备管理器：功能装备(F)/武器(Q)/消耗品(1/2/3) 三区管理，冷却系统
@@ -110,6 +125,7 @@ topdown_game_3d-v3/
 │   ├── save_manager.gd        # ★ 存档管理器：5槽位，JSON读写，可自定义路径
 │   ├── save_select_screen.gd  # ★ 存档选择界面：3D预览+动画预览+新建/进入/删除
 │   ├── start_screen.gd / menu_manager.gd / keybind_menu.gd / time_display.gd
+│   └── mcp_interaction_server.gd  # MCP TCP 交互服务器（127.0.0.1:9090，外部工具接入）
 ├── shaders/
 │   └── thrust_beam.gdshader   # 突刺光束着色器（前缘生长+噪声流动+Fresnel淡出）
 └── models/
@@ -133,7 +149,7 @@ world_3d._ready()
   → _on_game_started()
       ├── 光照 / 地面 / 障碍物（登记占地）
       ├── _create_lava()           → 岩浆（边界，落入岩浆掉血）
-      ├── _create_player()          → 玩家（含血量/背包/近战/初始物资：木剑+木材12+石头8）
+      ├── _create_player()          → 玩家（含血量/背包/近战/初始物资：木材12+石头8+手电筒+手持火把+木剑）
       ├── _create_resource_nodes()  → 25树 + 15石头（可采集）
       ├── 动物 / 摄像机 / 小地图 / 装备栏
       ├── _create_inventory_ui()    → 背包（Tab）
@@ -156,7 +172,7 @@ world_3d._ready()
 | **Q** | 切换武器（木剑→关） |
 | **1 / 2 / 3** | 使用对应消耗品栏位物品（8 秒冷却） |
 | **Tab** | 背包（拖拽整理，右键物品 → 装备 / 卸下 / 使用） |
-| **E** | **交互**：靠近未点燃的篝火添加木材点燃（燃烧 6 游戏小时，熄灭后可再添加） |
+| **E** | **篝火交互**：点燃（3 木材）/ 燃料过半后追加（2 木材补满） |
 | **B** | 建造菜单 → 选配方 → 幽灵预览 → 左键放置 |
 | **R** | 建造时旋转 90° |
 | 右键(按住) | **瞄准**（移速降至1/4 + 摄像机平滑偏移到鼠标指向处）；建造中点右键取消 |
@@ -239,12 +255,13 @@ var current_speed: float = speed * 0.25 if is_aiming() else speed
 **一切皆数据，新增内容不改代码：**
 
 - **新物品/材料** → `data/items/` 加 .tres（ItemData），ItemDB 自动收录
-  
+
   **ItemData 属性：** `id`、`display_name`、`description`、`item_type`（MATERIAL/EQUIPMENT/WEAPON）、`max_stack`（默认 99）、`heal_amount`（>0 表示可食用）、`ui_color`（背包底色）
 - **新武器** → `data/items/weapons/` 加 .tres（WeaponData：伤害/范围/角度/冷却/击退）
-- **新建筑** → `data/buildings/` 加 .tres（BuildingData：尺寸/颜色/成本/发光），建造菜单自动出现
+- **新建筑** → `data/buildings/` 加 .tres（BuildingData），建造菜单自动出现（属性见下文"建筑数据 BuildingData"）
 - **新的可攻击对象** → 挂 `health.gd`（命名 "Health"）+ 加入 `"damageable"` 组，近战即可命中
-- **新光源装备** → 代码里 new Equipment（参考 player_3d.gd `_make_torch`）
+- **新光源装备** → `data/items/equipment/` 加 .tres（Equipment 类），装备栏 F 键循环切换
+- **新交互建筑逻辑** → 写一个脚本（实现 `setup(data, player, day_night, state)` 与 `get_state()`），在 BuildingData 的 `logic_script` 填路径即可，放置/存档全自动接入（参考 `simple_torch.gd`）
 - **新掉落物** → `Pickup.spawn(parent, item_res, amount, pos)` 自动处理掉落动画 + 拾取飞行，所有物品统一进背包
 - **受击反馈** → 任何挂载 `health.gd` 的实体自动获得：模型闪红 0.3s + 彩色溅射粒子。粒子颜色通过 `set_particle_color()` 设置，默认白色
 
@@ -255,66 +272,102 @@ var current_speed: float = speed * 0.25 if is_aiming() else speed
 **信号解耦：** `health.died` / `inventory.changed` / `build_menu.recipe_selected`，系统间不直接引用。
 
 **占地管理：** 世界维护 `_occupied: Array[AABB]`（障碍物/资源/建筑），
-`is_area_free(center, half)` 统一做建造合法性校验；资源被采完自动释放占地。
+`is_area_free(center, half)` 统一做建造合法性校验；资源被采完自动释放占地；
+可消失建筑（如翻倒的火把）通过 `unregister_occupied()` 释放位置。
+
+### 建筑一览（data/buildings/*.tres）
+
+| 建筑 | 建造消耗 | 定位 |
+|------|---------|------|
+| 篝火 | 石头×3 | 主照明：需 3 木材点燃，燃烧 6 游戏小时，过半可追加 2 木材，触碰有持续伤害 |
+| 简易火把 | 木材×1 | 小范围照明 + 一次性陷阱：燃烧 4 游戏小时，被碰翻倒并造成一次伤害 |
+| 木墙 | 木材×3 | 阻挡动物 |
+| 木地基 | 石头×2 + 木材×6 | 垫脚平台 |
+
+### 建筑数据 BuildingData
+
+**文件：** `scripts/building/building_data.gd`（建筑尺寸不存配置，由 `scene_path` 指向预制体的网格 AABB 决定：占地、幽灵预览、贴地高度全自动）
+
+| 属性 | 说明 |
+|------|------|
+| `id` / `display_name` / `description` / `color` | 标识与建造菜单显示 |
+| `cost` | 建造消耗字典，如 `{"stone": 2, "wood": 6}` |
+| `scene_path` | 外观预制体路径（空则回退 1×1×1 BoxMesh） |
+| `logic_script` | 交互脚本路径（实现 `setup()` / `get_state()`），放置时自动挂载为 `BuildingLogic` 子节点 |
+| `emits_light` / `light_color` / `light_energy` / `light_range` / `light_attenuation` / `light_shadow_enabled` | 光源参数（放置时覆盖预制体内灯光值，灯光位置在 .tscn 内摆放） |
+| `fuel_item_id` / `fuel_per_ignite` | 燃料 ID / 点燃消耗数量（篝火专用路径） |
+| `fuel_per_refuel` / `refuel_threshold` | 燃烧中可追加的燃料数量（0=不可追加）/ 追加阈值（剩余比例 ≤ 阈值时可交互） |
+| `burn_duration_hours` | 单次满燃料燃烧时长（游戏小时） |
+| `interaction_range` | 交互半径（米） |
+| `hazard_damage` / `hazard_interval` | 触碰扣血量（>0 启用危险区）/ 扣血间隔（秒） |
+| `hazard_knockback` / `hazard_knockback_up` | 水平击退冲量 / 竖直击退冲量 |
+| `hazard_animal_damage_multiplier` / `hazard_animal_knockback_multiplier` | 小动物伤害/击退倍率（相对玩家） |
 
 ### 建筑发光参数
 
-**文件：** `scripts/building/building_data.gd`
+发光建筑放置时，若预制体内有 OmniLight3D 则参数以 `.tres` 为准覆盖（颜色/强度/射程/衰减/阴影），灯光**位置**仍在 `.tscn` 预制体内可视化摆放；无预制体的回退分支自动在建筑上方 0.6m 加灯。
 
-建筑（如篝火）可配置发光属性：
-
-| 属性 | 类型 | 说明 |
-|------|------|------|
-| `emits_light` | bool | 是否发光 |
-| `light_color` | Color | 光颜色（篝火默认暖橙） |
-| `light_energy` | float | 光强度（默认 3.0） |
-| `light_range` | float | 光照范围（默认 8m） |
-| `light_attenuation` | float | 衰减（默认 1.0） |
-| `light_shadow_enabled` | bool | 灯光是否投阴影 |
-
-发光建筑放置时自动添加 OmniLight3D 子节点，位置在建筑顶部以上 0.6m。光源参数以 `.tres` 为准，放置时覆盖预制体内的灯光值（灯光位置仍在 `.tscn` 预制体内）。
-
-### 危险区（触碰扣血 + 击退，v3.5.1+）
+### 危险区（触碰扣血 + 击退）
 
 **文件：** `scripts/combat/hazard.gd`（`class_name Hazard`，基于 Area3D 的可复用组件）
 
-建筑可通过 `BuildingData` 配置为危险区（如篝火），玩家触碰后扣血并击退：
-
-| 属性 | 类型 | 说明 |
-|------|------|------|
-| `hazard_damage` | float | 每次扣血量（>0 启用危险区） |
-| `hazard_interval` | float | 扣血间隔（秒） |
-| `hazard_knockback` | float | 水平击退冲量（0 = 不击退） |
-| `hazard_knockback_up` | float | 竖直击退冲量（瞬时上抛，独立于水平） |
-
 **机制：**
-- 玩家进入危险区立即触发一次扣血，之后按 `hazard_interval` 周期性扣血
-- 击退方向为"从危险区中心向外"，水平击退走衰减机制（推开滑动感）
-- 竖直击退为**瞬时冲量**（直接作用于 velocity.y，与跳跃同机制），避免落地后残值反复抬升抖动
-- `place_building()` 自动为 `hazard_damage > 0` 的建筑附加 Area3D（覆盖占地范围）
+- 玩家/小动物进入危险区**立即触发一次**扣血，之后按 `hazard_interval` 周期性扣血
+- 小动物（RigidBody3D + Health 子节点）套用伤害/击退倍率；树/石头等静态体不受影响
+- 击退方向为"从危险区中心向外"，水平击退走衰减机制（推开滑动感），竖直击退为瞬时冲量
+- `place_building()` 自动为 `hazard_damage > 0` 的建筑附加 Area3D，碰撞盒尺寸取 `maxf(尺寸, 0.5)` 并**对齐网格实际范围**（居中建模的建筑盒子随 AABB 最低点下移，保证贴地实体都能触发——v3.7.1 修复简易火把动物无法触发的问题）
+- 篝火：未点燃时危险区关闭，点燃后开启；简易火把：翻倒即关闭（实现一次性伤害）
 - 后续地刺等危险物：新建 .tres 配 `hazard_*` 字段即可复用，无需改代码
 
-**篝火当前配置（campfire.tres）：** `hazard_damage=1.0`、`hazard_interval=0.25`、`hazard_knockback=4.0`、`hazard_knockback_up=2.0`、动物伤害倍率 1.5
+**当前配置：** 篝火 `damage=1.0, interval=0.25, knockback=4/2, 动物倍率 1.5`；简易火把 `damage=1.0, interval=3600（一次性）, knockback=4/2, 动物倍率 1.5`
 
-### 篝火交互（v3.7.0+）
+### 篝火交互（v3.7.0+，v3.7.1 完善）
 
-**文件：** `scripts/building/campfire.gd`（`class_name CampfireLogic`，由 `place_building` 在 `fuel_item_id` 非空时自动挂载）
+**文件：** `scripts/building/campfire.gd`（`class_name CampfireLogic`，由 `place_building` 在 `fuel_item_id` 非空且未配置 `logic_script` 时自动挂载）
 
 | 属性 | 值 | 说明 |
 |------|-----|------|
-| `emits_light` | true | 光源参数仍以 `.tres` 为准，但**放置后默认关闭**，点燃时才发光 |
+| `cost` | 石头×3 | 建造消耗（木材全部走交互） |
 | `fuel_item_id` | wood | 燃料物品 ID |
-| `fuel_per_ignite` | 3 | 每次点燃消耗的木材数 |
-| `burn_duration_hours` | 6.0 | 单次燃烧时长（**游戏小时**，随昼夜 `seconds_per_day` 换算，暂停不计时） |
+| `fuel_per_ignite` | 3 | 点燃消耗木材数 |
+| `fuel_per_refuel` | 2 | 燃烧中追加木材数（0 = 不可追加） |
+| `refuel_threshold` | 0.5 | 剩余燃料 ≤ 该比例时可交互追加，追加后燃料补满 |
+| `burn_duration_hours` | 6.0 | 满燃料燃烧时长（**游戏小时**，随昼夜 `seconds_per_day` 换算，暂停不计时） |
 | `interaction_range` | 1.8 | 交互半径（米），需靠近才有效 |
 
-**流程：** 放置（3 石 + 2 木）→ 未点燃（无光无火、危险区关闭）→ 靠近显示浮动提示 `[E] 添加木柴 ×3` → 按 **E** 扣 3 木材点燃 → 燃烧 6 游戏小时（火光闪烁）→ 自动熄灭 → 可再次按 E 添加。木材不足时提示变红并显示 `[E] 木材不足 ×3`。
+**流程：** 放置（3 石头，场景中只有石头，无光无火、危险区关闭）→ 靠近显示 `[E] 添加木柴 ×3` → 按 **E** 点燃（木柴出现 + 火焰 + 灯光）→ 燃烧 6 游戏小时，**木柴模型随剩余燃料缩小** → 剩余 ≤50% 提示变为 `[E] 添加木柴 ×2`，按 **E** 补满燃料（木柴恢复原大小）→ 燃尽木柴消失回到未点燃状态 → 可再次点燃。木材不足时提示变红显示需要数量。
 
 **实现要点：**
-- 发光/危险区由 `CampfireLogic` 按燃烧状态切换：`Light.visible`、`Flame.visible`、`Hazard.monitoring` 同步开关
+- 发光/危险区/木柴显示由 `CampfireLogic` 按燃烧状态切换：`Light.visible`、`Flame.visible`、`Log*.visible`、`Hazard.monitoring` 同步开关
+- 木柴缩放 = 剩余燃料比例（下限 0.08 防止 0 缩放），追加燃料后立即恢复
 - 燃烧计时用 `delta × 24 / seconds_per_day` 换算游戏小时，调整一天时长或暂停都自动正确
 - 多个篝火同时在交互范围内时只有**最近**的一处响应，按一次不会扣多份木材
 - 提示用 `Label3D`（billboard + no_depth_test），上下浮动更显眼；存档写入 `{lit, remaining_hours}`，进档后按剩余时长继续燃烧
+
+### 简易火把（v3.7.1+）
+
+**文件：** `scripts/building/simple_torch.gd`（`class_name SimpleTorchLogic`，由 `place_building` 按 `BuildingData.logic_script` 自动挂载）
+
+| 属性 | 值 | 说明 |
+|------|-----|------|
+| `cost` | 木材×1 | 建造消耗 |
+| `burn_duration_hours` | 4.0 | 站立燃烧时长（游戏小时） |
+| 光源 | 暖橙 / 2.2 / 6m / 无阴影 | 位置对齐火焰尖（随燃烧端下移），轻微闪烁 |
+| `hazard_damage` | 1.0（interval=3600） | 触碰一次性伤害 + 击退（动物 1.5 倍） |
+| `logic_script` | simple_torch.gd | 交互逻辑脚本 |
+
+**行为：**
+- 放置即燃烧：木杆（顶细底粗）+ 绑扎环 + 双层火焰；木杆随燃烧**变短**（按剩余燃料比例，杆底钉在地面），绑扎环/火焰/灯光跟随燃烧端下移
+- **被玩家/小动物碰到立即翻倒**：绕杆底触地点旋转 88°，倒向**远离碰撞者**的一侧，倒下后按地形贴地（取杆底/杆梢地形较低者整体下移，坡地不悬空）；同时受一次伤害 + 击退，翻倒即关闭危险区（一次性）
+- 翻倒/燃尽后：火焰 2.2~2.5s 缩小熄灭（灯光同步变暗）→ 整支火把缓慢沉入地底（3.3s，EASE_IN）→ 消失并**释放占地**（原地可重新建造）
+- 站立期间动物同样可触发翻倒（危险区盒覆盖实体范围）
+- 存档 `{lit, remaining_hours}`：按剩余燃料恢复燃烧状态与木杆长度
+
+**实现要点：**
+- 翻倒绕触地点旋转：轴心 = 网格 AABB 最低点的世界位置；`_compute_aabb` 对已入树节点返回全局 AABB，需减去放置高度换算回本地偏移
+- 危险区受害者过滤与 `hazard.gd` 一致（玩家 + 带 Health 的刚体），火把自身碰撞体/地形不触发
+- 沉地结束调用 `world.unregister_occupied()` 释放占地（放置时按与 `place_building` 相同算法记录 AABB）
+- 昼夜属性缺失时自动降级（`seconds_per_day` 取不到则燃烧计时不推进），无崩溃
 
 ### 地形系统（v3.4.1+）
 
@@ -426,8 +479,8 @@ var current_speed: float = speed * 0.25 if is_aiming() else speed
 | 种类 | 24 种 | 从河狸、蜜蜂到老虎等 |
 
 砍树/砸石头（近战）→ 掉木材/石头（上抛弹跳→落地滑行→可拾取）→ 走进自动飞向角色 → B 打开建造 →
-消耗材料放篝火(发光)/木墙(阻挡)/木地基(平台)。
-杀动物 → 掉生肉（右键使用回血 15HP）。走进岩浆 → 持续掉血 → 死亡 → 回存档选择界面。
+放置建筑：**篝火**（照明，3 石头，需木材点燃）/ **简易火把**（照明+陷阱，1 木材）/ **木墙**（阻挡动物，3 木材）/ **木地基**（垫脚平台，2 石头+6 木材）。
+杀动物 → 掉生肉（食用回血 15HP）。走进岩浆 → 持续掉血 → 死亡 → 回存档选择界面。
 
 ### 掉落 / 拾取动画
 
@@ -573,9 +626,9 @@ ParticleProcessMaterial:
 ```
 
 **粒子颜色** — 通过 `Health.set_particle_color(Color)` 在每个实体的创建位置预设：
-- 树（`resource_node.gd:108`）→ `Color(0.40, 0.26, 0.13)` 树干棕
-- 石头（`resource_node.gd:108`）→ `Color(0.45, 0.45, 0.48)` 灰色
-- 动物（`animal_spawner.gd:128` / `world_3d.gd:449`）→ `Color(0.75, 0.3, 0.3)` 生肉红
+- 树（`resource_node.gd`）→ `Color(0.40, 0.26, 0.13)` 树干棕
+- 石头（`resource_node.gd`）→ `Color(0.45, 0.45, 0.48)` 灰色
+- 动物（`animal_spawner.gd` / `world_3d.gd`）→ `Color(0.75, 0.3, 0.3)` 生肉红
 - 玩家 → 未设，默认 `Color.WHITE`
 
 **表面偏移** — 粒子从受击方向的表面发出：
@@ -626,9 +679,9 @@ ParticleProcessMaterial:
 
 **相关文件：**
 - `scripts/combat/health.gd` — 粒子生成和颜色管理
-- `scripts/world/resource_node.gd:108` — 树/石头颜色预设
-- `scripts/animal_spawner.gd:128` — 动物受击粒子颜色预设
-- `scripts/world_3d.gd:449` — 动物重生颜色预设
+- `scripts/world/resource_node.gd` — 树/石头颜色预设
+- `scripts/animal_spawner.gd` — 动物受击粒子颜色预设
+- `scripts/world_3d.gd` — 动物重生颜色预设
 
 ### 玩家 HUD
 
@@ -678,7 +731,7 @@ ParticleProcessMaterial:
 @export var seconds_per_day: float = 480.0  # 480 = 8分钟一天
 ```
 
-调整该值即可改变白天/夜晚总时长，时钟显示、存档、动物昼夜行为自动适配，不会出错。默认 **8 分钟一天**。
+调整该值即可改变白天/夜晚总时长，时钟显示、存档、动物昼夜行为自动适配，不会出错。默认 **8 分钟一天**。篝火/简易火把的燃烧时长（游戏小时）同样按该值换算。
 
 ### 存档兼容
 
@@ -755,7 +808,7 @@ ParticleProcessMaterial:
 | 类别 | 存储内容 |
 |------|---------|
 | 玩家 | 位置 (x,y,z)、血量、背包全部格子、装备三区数据（功能装备ID列表+当前索引 / 武器ID列表+当前索引 / 消耗品栏位ID数组+冷却状态）、角色模型/皮肤 |
-| 世界 | 昼夜时间、已放置建筑、资源节点位置(树/石头)、存活动物数量 |
+| 世界 | 昼夜时间、已放置建筑（含交互状态：篝火 `{lit, remaining_hours}`、简易火把 `{lit, remaining_hours}`）、资源节点位置(树/石头)、存活动物数量 |
 | 元数据 | 版本号、时间戳、累计游玩时长 |
 
 ### 存档触发
@@ -788,7 +841,7 @@ SaveManager (RefCounted 静态工具类)
   ├── set_save_dir(path) → 自定义存档目录
   └── reset_save_dir()  → 恢复默认路径
 
-world_3d._collect_save_data()  → 收集玩家+世界状态
+world_3d._collect_save_data()  → 收集玩家+世界状态（建筑遍历实现 get_state() 的子节点）
 world_3d._restore_from_save()  → 恢复位置/血量/背包/建筑/昼夜
 ```
 
@@ -800,8 +853,10 @@ world_3d._restore_from_save()  → 恢复位置/血量/背包/建筑/昼夜
 |----|------|
 | 1 | 地面、障碍物、资源节点、建筑、玩家 |
 | 2 | 动物 (RigidBody3D, continuous_cd=true) |
+| 4 | 地形查询专用射线层（建筑放置/边界/岩浆判定用，不参与实体碰撞） |
 
-玩家与动物间无物理碰撞（代码推挤）；近战命中靠 `"damageable"` 组 + 距离/角度判定。
+玩家与动物间无物理碰撞（代码推挤）；近战命中靠 `"damageable"` 组 + 距离/角度判定；
+危险区 Area3D 掩码 `1|2`，同时检测玩家与小动物。
 
 ---
 
@@ -818,20 +873,22 @@ v3.5.0 将原先纯代码生成的 3D 内容场景化，**大部分内容现在�
 | 树 / 石头 | `scenes/prefabs/tree.tscn` / `rock.tscn` | mesh、材质、碰撞体可编辑；位置仍由代码随机生成 |
 | 掉落物 | `scenes/prefabs/pickup.tscn` | 模型、标签、拾取区可编辑；颜色/标签文本运行时按物品覆盖 |
 | 障碍物 | `scenes/prefabs/obstacle.tscn` | 单位尺寸（1×1×1），运行时按随机尺寸缩放；材质运行时覆盖 |
-| 建筑外观 | `scenes/prefabs/building_*.tscn` | 篝火/木地基/木墙；`BuildingData.scene_path` 指向预制体，可加自定义 mesh/粒子 |
-| 物品/建筑数值 | `data/items/*.tres`、`data/buildings/*.tres` | 检查器直接编辑（伤害、回血、成本、尺寸等） |
+| 建筑外观 | `scenes/prefabs/building_*.tscn` | 篝火/简易火把/木地基/木墙；`BuildingData.scene_path` 指向预制体，可加自定义 mesh/粒子 |
+| 物品/建筑数值 | `data/items/*.tres`、`data/buildings/*.tres` | 检查器直接编辑（伤害、回血、成本、光源、危险区等） |
 
 **碰撞体优先级（玩家/资源/障碍物）：** 在 `.tscn` 中手动调整的 `CollisionShape3D`（形状/位置/大小）即最终碰撞体积，**完全可视化编辑、所见即所得**；仅当场景中没有对应碰撞节点时才回退到基于 mesh AABB 的自动计算。
 
+**建筑占地/贴地注意：** 建筑网格 AABB 决定占地与贴地高度（`BuildingData.get_size()` / `get_min_y()`），新增装饰件不要超出原包围盒，否则建造判定会跟着变大。
+
 ### 装备光源职责划分
 
-灯光参数按来源分工（手电筒/火把/篝火）：
+灯光参数按来源分工（手电筒/火把/篝火/简易火把）：
 
 | 参数 | 配置位置 | 说明 |
 |------|---------|------|
 | 位置 / 旋转 | `.tscn`（player.tscn / building_*.tscn） | 编辑器可视化摆放，装备切换不覆盖 |
 | 光锥角度 `spot_angle` | `.tscn`（SpotLight 节点） | 手电筒光锥范围 |
-| 强度 `light_energy` | `.tres`（equipment/*.tres、buildings/*.tres） | 手电 5 / 火把 5 / 篝火 3.5 |
+| 强度 `light_energy` | `.tres`（equipment/*.tres、buildings/*.tres） | 手电 5 / 火把 5 / 篝火 3.5 / 简易火把 2.2 |
 | 射程 / 衰减 | `.tres` | `spot_range`/`omni_range`、`spot_attenuation`/`omni_attenuation` |
 | 颜色 / 阴影 | `.tres` | `light_color`、`shadow_enabled`（动态光关阴影避免玩家产生影子） |
 
@@ -850,7 +907,7 @@ v3.5.0 将原先纯代码生成的 3D 内容场景化，**大部分内容现在�
   world_3d._create_obstacles() → instantiate obstacle.tscn + 随机尺寸/材质
   resource_node.spawn()       → instantiate tree.tscn / rock.tscn（位置随机）
   pickup.spawn()              → instantiate pickup.tscn
-  place_building()            → 优先 instantiate building_*.tscn（scene_path），空则回退 BoxMesh
+  place_building()            → instantiate building_*.tscn（scene_path）+ 危险区 + 交互逻辑（logic_script / fuel_item_id）
 ```
 
 **回退机制**：所有预制体加载失败时自动回退到程序化构建（BoxMesh 等），保证可运行。
@@ -862,6 +919,7 @@ v3.5.0 将原先纯代码生成的 3D 内容场景化，**大部分内容现在�
 - **导出的 .remap 后缀**：导出包里 DirAccess 列出的文件是 `xxx.tres.remap`，扫描目录时必须 `trim_suffix(".remap")` 再判断和加载（ItemDB / BuildController 已处理）
 - **Object.get 冲突**：自定义静态方法不能叫 `get`（与原生冲突），ItemDB 用 `get_item`
 - **AABB.position**：Godot 4 中是最小角，中心 = `position + size*0.5`
+- **`_compute_aabb` 空间**：对已入树的节点返回**全局** AABB——需要本地偏移时减去根节点 `position`（简易火把触地点/危险区对齐都用了这一换算）
 - **UI 缩放**：1920x1080 参考，scale 0.6~1.6
 - **GLB 动画**：attack-melee-* 用于挥击，die 用于死亡，均设 LOOP_NONE
 - **幽灵合法性**：占地(占用AABB) + 世界边界 + 材料是否足够，三者同时决定绿/红
@@ -869,4 +927,6 @@ v3.5.0 将原先纯代码生成的 3D 内容场景化，**大部分内容现在�
 - **路径配置**：`user://save_config.json`，SaveManager 启动时自动加载，无需手动编辑
 - **SaveManager 为静态 RefCounted**：无需实例化，直接 `SaveManager.save_game(slot, data)` 调用
 - **资源持久化**：树和石头位置存入存档，重新加载后不会随机重置
+- **建筑存档状态**：交互建筑保存/恢复任何实现 `get_state()` 的子节点字典（篝火/简易火把均为 `{lit, remaining_hours}`），进档后按剩余时长继续
 - **动物行为**：动画名由 GLB 内置 `AnimationPlayer` 动态映射（所有动物共用同一套动画）；动物模型前方为 **+Z**，转向公式为 `atan2(dir.x, dir.z)`；所有边界/岩浆判定统一使用地形专用射线层（第 4 层）；夜间通过 `"day_night_system"` 组查找昼夜系统，无直接引用依赖
+- **MCP 交互服务器**：`scripts/mcp_interaction_server.gd` 监听 `127.0.0.1:9090`，供外部工具（MCP）接入控制/查询，与游戏逻辑解耦
