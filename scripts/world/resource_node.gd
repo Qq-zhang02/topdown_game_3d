@@ -32,6 +32,10 @@ static func spawn(parent: Node, kind: String, pos: Vector3) -> ResourceNode:
 	node.collision_layer = 1
 	node.collision_mask = 0
 	node.add_to_group("damageable")
+	if kind == "tree":
+		# 树冠团簇非对称：随机朝向+轻微缩放让每棵树外观不同
+		node.rotate_y(randf() * TAU)
+		node.scale = Vector3.ONE * randf_range(0.9, 1.1)
 
 	match kind:
 		"tree":

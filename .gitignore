@@ -10,6 +10,10 @@ user/
 
 # 本地工具配置
 .zcode/
+AGENTS.md
+
+# mcp插件
+addons/
 
 # 系统文件
 Thumbs.db

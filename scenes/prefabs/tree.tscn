@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://bod4cbqdh5xli"]
+[gd_scene load_steps=14 format=3 uid="uid://bod4cbqdh5xli"]
 
 [ext_resource type="Script" uid="uid://dyfk6gr3xdpb3" path="res://scripts/world/resource_node.gd" id="1_resnode"]
 [ext_resource type="Script" uid="uid://b8ktlq8xqwd8x" path="res://scripts/combat/health.gd" id="2_health"]
@@ -8,17 +8,49 @@ albedo_color = Color(0.4, 0.26, 0.13, 1)
 roughness = 0.9
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_trunk"]
-top_radius = 0.12
-bottom_radius = 0.18
-height = 1.4
+top_radius = 0.1
+bottom_radius = 0.2
+height = 1.6
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_leaves"]
-albedo_color = Color(0.18, 0.45, 0.15, 1)
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_leaves_main"]
+albedo_color = Color(0.2, 0.47, 0.16, 1)
 roughness = 0.85
 
-[sub_resource type="SphereMesh" id="SphereMesh_leaves"]
-radius = 0.95
-height = 1.9
+[sub_resource type="SphereMesh" id="SphereMesh_leaves_main"]
+radius = 0.8
+height = 1.35
+radial_segments = 14
+rings = 8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_leaves_dark"]
+albedo_color = Color(0.15, 0.4, 0.13, 1)
+roughness = 0.85
+
+[sub_resource type="SphereMesh" id="SphereMesh_leaves_front"]
+radius = 0.55
+height = 0.95
+radial_segments = 12
+rings = 7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_leaves_mid"]
+albedo_color = Color(0.17, 0.43, 0.14, 1)
+roughness = 0.85
+
+[sub_resource type="SphereMesh" id="SphereMesh_leaves_back"]
+radius = 0.6
+height = 1.05
+radial_segments = 12
+rings = 7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_leaves_light"]
+albedo_color = Color(0.26, 0.54, 0.19, 1)
+roughness = 0.85
+
+[sub_resource type="SphereMesh" id="SphereMesh_leaves_top"]
+radius = 0.5
+height = 0.85
+radial_segments = 12
+rings = 7
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_col"]
 height = 1.6
@@ -29,14 +61,29 @@ collision_mask = 0
 script = ExtResource("1_resnode")
 
 [node name="Trunk" type="MeshInstance3D" parent="." unique_id=1167136794]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
 material_override = SubResource("StandardMaterial3D_trunk")
 mesh = SubResource("CylinderMesh_trunk")
 
 [node name="Leaves" type="MeshInstance3D" parent="." unique_id=2004378432]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.9, 0)
-material_override = SubResource("StandardMaterial3D_leaves")
-mesh = SubResource("SphereMesh_leaves")
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.2, 0)
+material_override = SubResource("StandardMaterial3D_leaves_main")
+mesh = SubResource("SphereMesh_leaves_main")
+
+[node name="LeavesFront" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.42, 1.85, 0.32)
+material_override = SubResource("StandardMaterial3D_leaves_dark")
+mesh = SubResource("SphereMesh_leaves_front")
+
+[node name="LeavesBack" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.4, 1.95, -0.35)
+material_override = SubResource("StandardMaterial3D_leaves_mid")
+mesh = SubResource("SphereMesh_leaves_back")
+
+[node name="LeavesTop" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.05, 2.75, 0.02)
+material_override = SubResource("StandardMaterial3D_leaves_light")
+mesh = SubResource("SphereMesh_leaves_top")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=663965422]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
