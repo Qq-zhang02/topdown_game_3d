@@ -36,6 +36,10 @@ static func spawn(parent: Node, kind: String, pos: Vector3) -> ResourceNode:
 		# 树冠团簇非对称：随机朝向+轻微缩放让每棵树外观不同
 		node.rotate_y(randf() * TAU)
 		node.scale = Vector3.ONE * randf_range(0.9, 1.1)
+	elif kind == "rock":
+		# 岩石尖角朝向随机：随机旋转+缩放让每块石头外观不同
+		node.rotate_y(randf() * TAU)
+		node.scale = Vector3.ONE * randf_range(0.85, 1.15)
 
 	match kind:
 		"tree":

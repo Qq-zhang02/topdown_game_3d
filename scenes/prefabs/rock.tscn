@@ -1,33 +1,73 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene format=3 uid="uid://k88mxxuqrlos"]
 
 [ext_resource type="Script" uid="uid://dyfk6gr3xdpb3" path="res://scripts/world/resource_node.gd" id="1_resnode"]
 [ext_resource type="Script" uid="uid://b8ktlq8xqwd8x" path="res://scripts/combat/health.gd" id="2_health"]
+[ext_resource type="ArrayMesh" path="res://models/rock_mesh.tres" id="3_rock_mesh"]
+[ext_resource type="ArrayMesh" path="res://models/rock_pebble.tres" id="4_rock_pebble"]
 
-[sub_resource type="SphereMesh" id="SphereMesh_rock"]
-radius = 0.7
-height = 1.0
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rock"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rock_main"]
 albedo_color = Color(0.45, 0.45, 0.48, 1)
+metallic = 0.05
+roughness = 0.75
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rock_dark"]
+albedo_color = Color(0.34, 0.34, 0.38, 1)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rock_light"]
+albedo_color = Color(0.56, 0.56, 0.59, 1)
 roughness = 0.7
-metallic = 0.1
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_col"]
 radius = 0.65
 
-[node name="Rock" type="StaticBody3D"]
-collision_layer = 1
+[node name="Rock" type="StaticBody3D" unique_id=333143105]
 collision_mask = 0
 script = ExtResource("1_resnode")
 
-[node name="RockMesh" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.35, 0)
-mesh = SubResource("SphereMesh_rock")
-material_override = SubResource("StandardMaterial3D_rock")
+[node name="RockMesh" type="MeshInstance3D" parent="." unique_id=144462051]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.42, 0)
+material_override = SubResource("StandardMaterial3D_rock_main")
+mesh = ExtResource("3_rock_mesh")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.35, 0)
+[node name="Pebble1" type="MeshInstance3D" parent="." unique_id=1827314601]
+transform = Transform3D(0.3688699, 0.17816098, 0.80136985, 0.17081645, 0.84266406, -0.26596817, -0.8029674, 0.26110533, 0.3115562, 0.52, 0.05, 0.28)
+material_override = SubResource("StandardMaterial3D_rock_main")
+mesh = ExtResource("4_rock_pebble")
+
+[node name="Pebble2" type="MeshInstance3D" parent="." unique_id=1363018464]
+transform = Transform3D(0.5015504, -0.29730594, 0.38737106, 0.26715913, 0.6318908, 0.13906853, -0.40874583, 0.048199754, 0.5662187, -0.48, 0.04, 0.42)
+material_override = SubResource("StandardMaterial3D_rock_dark")
+mesh = ExtResource("4_rock_pebble")
+
+[node name="Pebble3" type="MeshInstance3D" parent="." unique_id=461763134]
+transform = Transform3D(-0.8453464, 0.40201735, 0.5777296, 0.09637328, 0.9605182, -0.5273681, -0.69720984, -0.35466456, -0.7733766, 0.12, 0.05, -0.58)
+material_override = SubResource("StandardMaterial3D_rock_light")
+mesh = ExtResource("4_rock_pebble")
+
+[node name="Pebble4" type="MeshInstance3D" parent="." unique_id=1963949729]
+transform = Transform3D(-0.7239843, 0.1946289, -0.27922463, 0.23523508, 0.7604511, -0.07986674, 0.24599035, -0.15438211, -0.74542266, -0.62, 0.04, -0.18)
+material_override = SubResource("StandardMaterial3D_rock_dark")
+mesh = ExtResource("4_rock_pebble")
+
+[node name="Pebble5" type="MeshInstance3D" parent="." unique_id=1928607731]
+transform = Transform3D(-0.24778199, -0.14552382, 0.5830325, 0.2870271, 0.52539957, 0.2531219, -0.5279389, 0.35394645, -0.1360235, 0.68, 0.04, -0.12)
+material_override = SubResource("StandardMaterial3D_rock_main")
+mesh = ExtResource("4_rock_pebble")
+
+[node name="Pebble6" type="MeshInstance3D" parent="." unique_id=1014829853]
+transform = Transform3D(0.6574284, 0.39884487, 0.92125505, -0.3475554, 1.1235522, -0.2384032, -0.9418032, -0.13621178, 0.73106307, -0.18, 0.05, 0.62)
+material_override = SubResource("StandardMaterial3D_rock_light")
+mesh = ExtResource("4_rock_pebble")
+
+[node name="Pebble7" type="MeshInstance3D" parent="." unique_id=786822662]
+transform = Transform3D(-0.52437353, -0.119234405, -0.5227959, 0.13723993, 0.6770258, -0.29206374, 0.51836056, -0.2998653, -0.4515342, 0.34, 0.03, 0.52)
+material_override = SubResource("StandardMaterial3D_rock_dark")
+mesh = ExtResource("4_rock_pebble")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=568325669]
+transform = Transform3D(1.1005924, 0, 0, 0, 0.9234539, 0, 0, 0, 1.1091052, 0, 0.41819116, 0)
 shape = SubResource("SphereShape3D_col")
 
-[node name="Health" type="Node" parent="."]
+[node name="Health" type="Node" parent="." unique_id=1480701506]
 script = ExtResource("2_health")
